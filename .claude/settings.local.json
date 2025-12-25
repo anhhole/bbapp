@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go get:*)",
+      "Bash(export PATH=$PATH:~/go/bin)",
+      "Bash(wails build:*)"
+    ]
+  }
+}
