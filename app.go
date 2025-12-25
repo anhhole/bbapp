@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
 
 	"bbapp/internal/api"
@@ -469,26 +470,43 @@ func (a *App) addBigoListenerForSession(bigoRoomId, roomId string) error {
 	return nil
 }
 
-// Login authenticates with BB-Core
+// Login authenticates the user with BB-Core using username and password.
+// Returns an AuthResponse containing access token, refresh token, and user info.
+// Returns an error if credentials are invalid or the server is unreachable.
 func (a *App) Login(username, password string) (*api.AuthResponse, error) {
 	client := api.NewClient(a.bbCoreURL, "")
 	return client.Login(username, password)
 }
 
-// RefreshToken gets a new access token
+// RefreshToken obtains a new access token using the provided refresh token.
+// Returns an AuthResponse with the new tokens.
+// Returns an error if the refresh token is invalid or expired.
 func (a *App) RefreshToken(refreshToken string) (*api.AuthResponse, error) {
 	client := api.NewClient(a.bbCoreURL, "")
 	return client.RefreshToken(refreshToken)
 }
 
-// GetOverlayURL generates the overlay URL for OBS
+// GetOverlayURL generates the overlay URL for OBS Browser Source.
+// Returns the complete URL with scene, roomId, bbCoreUrl, and token as query parameters.
+// Returns empty string if inputs are invalid or overlay server is unavailable.
 func (a *App) GetOverlayURL(scene, roomId, token string) string {
+	// Validate inputs
+	if strings.TrimSpace(scene) == "" || strings.TrimSpace(roomId) == "" || strings.TrimSpace(token) == "" {
+		return ""
+	}
+
+	// Check if overlay server is available
+	if a.overlayServer == nil {
+		return ""
+	}
+
 	baseURL := a.overlayServer.GetURL()
 	return fmt.Sprintf("%s/overlay?scene=%s&roomId=%s&bbCoreUrl=%s&token=%s",
 		baseURL, scene, roomId, a.bbCoreURL, token)
 }
 
-// GetBBCoreURL returns the configured BB-Core URL
+// GetBBCoreURL returns the configured BB-Core base URL from environment.
+// Defaults to "http://localhost:8080" if not set in .env file.
 func (a *App) GetBBCoreURL() string {
 	return a.bbCoreURL
 }
