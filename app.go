@@ -126,7 +126,7 @@ func (a *App) AddStreamer(bigoRoomId, teamId, roomId string) error {
 		fmt.Printf("[App] ✓ Debug mode enabled - ALL frames will be saved to: %s\n", debugFilePath)
 	}
 
-	// Setup gift handler
+	// Setup gift handler (ENHANCED with complete payload)
 	bigoListener.OnGift(func(gift listener.Gift) {
 		fmt.Printf("[App] 🎁 GIFT RECEIVED: %s (%d diamonds) from %s in room %s\n",
 			gift.GiftName, gift.Diamonds, gift.SenderName, bigoRoomId)
@@ -138,14 +138,25 @@ func (a *App) AddStreamer(bigoRoomId, teamId, roomId string) error {
 			fmt.Printf("[App] ✓ Gift logged to file\n")
 		}
 
-		// Send to BB-Core
+		// Send to BB-Core with COMPLETE payload
 		if a.stompClient != nil {
 			payload := map[string]interface{}{
-				"type":      "GIFT",
-				"bigoId":    gift.SenderId,
-				"nickname":  gift.SenderName,
-				"giftName":  gift.GiftName,
-				"giftValue": gift.Diamonds,
+				"type":           "GIFT",
+				"roomId":         roomId,
+				"bigoRoomId":     gift.BigoRoomId,
+				"senderId":       gift.SenderId,
+				"senderName":     gift.SenderName,
+				"senderAvatar":   gift.SenderAvatar,
+				"senderLevel":    gift.SenderLevel,
+				"streamerId":     gift.StreamerId,
+				"streamerName":   gift.StreamerName,
+				"streamerAvatar": gift.StreamerAvatar,
+				"giftId":         gift.GiftId,
+				"giftName":       gift.GiftName,
+				"giftCount":      gift.GiftCount,
+				"diamonds":       gift.Diamonds,
+				"giftImageUrl":   gift.GiftImageUrl,
+				"timestamp":      gift.Timestamp,
 			}
 
 			destination := "/app/room/" + roomId + "/bigo"
@@ -156,6 +167,35 @@ func (a *App) AddStreamer(bigoRoomId, teamId, roomId string) error {
 			}
 		} else {
 			fmt.Println("[App] WARNING: STOMP client not connected, gift not forwarded to BB-Core")
+		}
+	})
+
+	// Setup chat handler
+	bigoListener.OnChat(func(chat listener.BigoChat) {
+		fmt.Printf("[App] 💬 CHAT RECEIVED: %s said \"%s\" in room %s\n",
+			chat.SenderName, chat.Message, bigoRoomId)
+
+		if a.stompClient != nil {
+			payload := map[string]interface{}{
+				"type":         "CHAT",
+				"roomId":       roomId,
+				"bigoRoomId":   chat.BigoRoomId,
+				"senderId":     chat.SenderId,
+				"senderName":   chat.SenderName,
+				"senderAvatar": chat.SenderAvatar,
+				"senderLevel":  chat.SenderLevel,
+				"message":      chat.Message,
+				"timestamp":    chat.Timestamp,
+			}
+
+			destination := "/app/room/" + roomId + "/bigo"
+			if err := a.stompClient.Publish(destination, payload); err != nil {
+				fmt.Printf("[App] ERROR: Failed to publish chat: %v\n", err)
+			} else {
+				fmt.Printf("[App] ✓ Chat forwarded to BB-Core: %s\n", destination)
+			}
+		} else {
+			fmt.Println("[App] WARNING: STOMP client not connected, chat not forwarded to BB-Core")
 		}
 	})
 
