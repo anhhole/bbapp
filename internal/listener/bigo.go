@@ -43,11 +43,26 @@ type Gift = BigoGift
 // GiftHandler handles gift events
 type GiftHandler func(Gift)
 
+// BigoChat represents a Bigo chat message
+type BigoChat struct {
+	SenderId     string
+	SenderName   string
+	SenderAvatar string
+	SenderLevel  int
+	Message      string
+	Timestamp    int64
+	BigoRoomId   string
+}
+
+// ChatHandler handles chat events
+type ChatHandler func(BigoChat)
+
 // BigoListener listens to Bigo room WebSocket
 type BigoListener struct {
 	roomId        string
 	ctx           context.Context
 	giftHandlers  []GiftHandler
+	chatHandlers  []ChatHandler
 	debugMode     bool
 	debugFile     *os.File
 	debugMutex    sync.Mutex
@@ -62,6 +77,7 @@ func NewBigoListener(roomId string, ctx context.Context) *BigoListener {
 		roomId:        roomId,
 		ctx:           ctx,
 		giftHandlers:  make([]GiftHandler, 0),
+		chatHandlers:  make([]ChatHandler, 0),
 		debugMode:     false,
 		lastFrameTime: time.Now(),
 		frameCount:    0,
@@ -71,6 +87,11 @@ func NewBigoListener(roomId string, ctx context.Context) *BigoListener {
 // OnGift registers gift handler
 func (b *BigoListener) OnGift(handler GiftHandler) {
 	b.giftHandlers = append(b.giftHandlers, handler)
+}
+
+// OnChat registers chat handler
+func (b *BigoListener) OnChat(handler ChatHandler) {
+	b.chatHandlers = append(b.chatHandlers, handler)
 }
 
 // Start starts listening
@@ -247,7 +268,27 @@ func (b *BigoListener) handleFrame(data string) {
 		}
 		return
 	}
-	
+
+	// Check for chat messages
+	if hasType && msgType == "CHAT" {
+		fmt.Printf("\n💬 CHAT MESSAGE DETECTED! 💬\n")
+		fmt.Printf("Parsed JSON: %+v\n\n", msg)
+
+		chat, err := b.parseChat(msg)
+		if err != nil {
+			fmt.Printf("[BigoListener] ERROR: Failed to parse chat: %v\n", err)
+			return
+		}
+
+		fmt.Printf("[BigoListener] ✓ Chat parsed: %s said: %s\n", chat.SenderName, chat.Message)
+
+		// Notify handlers
+		for _, handler := range b.chatHandlers {
+			handler(chat)
+		}
+		return
+	}
+
 	// Check for alternative gift indicators (Bigo might use different field names)
 	// Common patterns: msgType, action, event, cmd, payload.type, etc.
 	
@@ -341,4 +382,34 @@ func (b *BigoListener) parseGift(msg map[string]interface{}) (BigoGift, error) {
 	}
 
 	return gift, nil
+}
+
+// parseChat extracts chat message data
+func (b *BigoListener) parseChat(msg map[string]interface{}) (BigoChat, error) {
+	chat := BigoChat{
+		Timestamp:  time.Now().UnixMilli(),
+		BigoRoomId: b.roomId,
+	}
+
+	// Extract sender info
+	if sender, ok := msg["sender"].(map[string]interface{}); ok {
+		chat.SenderId, _ = sender["id"].(string)
+		chat.SenderName, _ = sender["nickname"].(string)
+		chat.SenderAvatar, _ = sender["avatar"].(string)
+
+		if level, ok := sender["level"].(float64); ok {
+			chat.SenderLevel = int(level)
+		}
+	} else {
+		return chat, fmt.Errorf("missing sender field")
+	}
+
+	// Extract message
+	if message, ok := msg["message"].(string); ok {
+		chat.Message = message
+	} else {
+		return chat, fmt.Errorf("missing message field")
+	}
+
+	return chat, nil
 }
