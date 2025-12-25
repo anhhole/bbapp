@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -107,13 +108,23 @@ func (c *Client) SendHeartbeat(roomId string, status HeartbeatRequest) error {
 
 // Login authenticates with BB-Core
 func (c *Client) Login(username, password string) (*AuthResponse, error) {
+	if strings.TrimSpace(username) == "" {
+		return nil, fmt.Errorf("username cannot be empty")
+	}
+	if strings.TrimSpace(password) == "" {
+		return nil, fmt.Errorf("password cannot be empty")
+	}
+
 	url := fmt.Sprintf("%s/api/v1/auth/login", c.baseURL)
 
 	reqBody := LoginRequest{
 		Username: username,
 		Password: password,
 	}
-	jsonData, _ := json.Marshal(reqBody)
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -132,10 +143,17 @@ func (c *Client) Login(username, password string) (*AuthResponse, error) {
 
 // RefreshToken gets a new access token
 func (c *Client) RefreshToken(refreshToken string) (*AuthResponse, error) {
+	if strings.TrimSpace(refreshToken) == "" {
+		return nil, fmt.Errorf("refresh token cannot be empty")
+	}
+
 	url := fmt.Sprintf("%s/api/v1/auth/refresh-token", c.baseURL)
 
 	reqBody := RefreshTokenRequest{RefreshToken: refreshToken}
-	jsonData, _ := json.Marshal(reqBody)
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
