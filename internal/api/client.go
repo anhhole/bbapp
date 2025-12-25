@@ -61,7 +61,7 @@ func (c *Client) SaveConfig(roomId string, config *Config) error {
 		return fmt.Errorf("marshal config: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", url, bytes.NewReader(jsonData))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
