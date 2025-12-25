@@ -1,0 +1,48 @@
+.pk-mode-scene {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pk-mode-scene .card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pk-mode-scene .card h2 {
+  margin: 0 0 20px 0;
+  color: #333;
+}
+
+.pk-mode-scene input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+
+.pk-mode-scene button {
+  padding: 12px 24px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  width: auto;
+  margin: 0;
+}
+
+.pk-mode-scene button:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.pk-mode-scene button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}

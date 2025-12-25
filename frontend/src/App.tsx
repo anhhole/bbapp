@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LoginPage } from './components/LoginPage';
 import { SceneTabs } from './components/SceneTabs';
+import { PKModeScene } from './scenes/pk-mode/ui/PKModeScene';
 import { RefreshToken } from '../wailsjs/go/main/App';
 import type { User } from './shared/types';
 import './App.css';
@@ -84,11 +85,10 @@ function App() {
 
       <SceneTabs activeScene={activeScene} onSceneChange={handleSceneChange}>
         {activeScene === 'pk-mode' && (
-          <div className="scene-placeholder">
-            <h2>PK Mode</h2>
-            <p>PK Mode UI will be implemented here</p>
-            {/* PKModeScene will be added in next phase */}
-          </div>
+          <PKModeScene
+            accessToken={accessToken}
+            onSessionChange={setSessionActive}
+          />
         )}
       </SceneTabs>
     </div>
