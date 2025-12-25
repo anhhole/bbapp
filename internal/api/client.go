@@ -45,6 +45,27 @@ func (c *Client) GetConfig(roomId string) (*Config, error) {
 	return &config, nil
 }
 
+// SaveConfig saves room configuration to BB-Core
+func (c *Client) SaveConfig(roomId string, config *Config) error {
+	url := fmt.Sprintf("%s/api/v1/stream/rooms/%s/bbapp-config", c.baseURL, roomId)
+
+	jsonData, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.authToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	var resp map[string]interface{}
+	return c.doRequest(req, &resp)
+}
+
 func (c *Client) StartSession(roomId string, deviceHash string) (*StartSessionResponse, error) {
 	url := fmt.Sprintf("%s/pk/start-from-bbapp/%s", c.baseURL, roomId)
 

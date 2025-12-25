@@ -10,6 +10,10 @@ export function ConnectToCore(arg1, arg2, arg3) {
   return window['go']['main']['App']['ConnectToCore'](arg1, arg2, arg3);
 }
 
+export function GetBBAppConfig(arg1) {
+  return window['go']['main']['App']['GetBBAppConfig'](arg1);
+}
+
 export function GetBBCoreURL() {
   return window['go']['main']['App']['GetBBCoreURL']();
 }
@@ -26,6 +30,10 @@ export function GetSessionStatus() {
   return window['go']['main']['App']['GetSessionStatus']();
 }
 
+export function InitializeBBCoreClient(arg1, arg2) {
+  return window['go']['main']['App']['InitializeBBCoreClient'](arg1, arg2);
+}
+
 export function Login(arg1, arg2) {
   return window['go']['main']['App']['Login'](arg1, arg2);
 }
@@ -36,6 +44,10 @@ export function RefreshToken(arg1) {
 
 export function RemoveStreamer(arg1) {
   return window['go']['main']['App']['RemoveStreamer'](arg1);
+}
+
+export function SaveBBAppConfig(arg1, arg2) {
+  return window['go']['main']['App']['SaveBBAppConfig'](arg1, arg2);
 }
 
 export function StartPKSession(arg1, arg2, arg3) {

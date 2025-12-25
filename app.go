@@ -537,3 +537,11 @@ func (a *App) GetBBAppConfig(roomId string) (*api.Config, error) {
 	fmt.Printf("[App] ✓ Config fetched successfully for room: %s\n", roomId)
 	return config, nil
 }
+
+// SaveBBAppConfig saves configuration to BB-Core
+func (a *App) SaveBBAppConfig(roomId string, config api.Config) error {
+	if a.apiClient == nil {
+		return fmt.Errorf("not connected to BB-Core")
+	}
+	return a.apiClient.SaveConfig(roomId, &config)
+}

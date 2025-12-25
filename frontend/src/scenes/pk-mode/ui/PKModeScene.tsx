@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import './PKModeScene.css';
-import { GetBBAppConfig, InitializeBBCoreClient, GetBBCoreURL } from '../../../../wailsjs/go/main/App';
+import { GetBBAppConfig, InitializeBBCoreClient, GetBBCoreURL, SaveBBAppConfig } from '../../../../wailsjs/go/main/App';
 import type { PKConfig, Team } from '../../../shared/types';
 import { Plus } from 'lucide-react';
 import { TeamCard } from './components/TeamCard';
@@ -17,6 +17,8 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
   const [roomId, setRoomId] = useState('');
   const [config, setConfig] = useState<PKConfig | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [configSaved, setConfigSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
 
   const generateDefaultTemplate = (roomId: string): PKConfig => ({
@@ -83,6 +85,52 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
     }
   };
 
+  const validateConfig = (): string | null => {
+    if (!config) return 'No configuration loaded';
+    if (!config.roomId.trim()) return 'Room ID is required';
+    if (config.teams.length === 0) return 'At least one team is required';
+
+    for (const team of config.teams) {
+      if (!team.name.trim()) return 'All teams must have a name';
+      if (!team.bindingGift.trim()) return 'All teams must have a binding gift';
+      if (team.streamers.length === 0) return 'Each team must have at least one streamer';
+
+      for (const streamer of team.streamers) {
+        if (!streamer.name.trim()) return 'All streamers must have a name';
+        if (!streamer.bigoRoomId.trim()) return 'All streamers must have a Bigo Room ID';
+        if (!streamer.bindingGift.trim()) return 'All streamers must have a binding gift';
+      }
+    }
+
+    return null; // Valid
+  };
+
+  const handleSaveConfig = async () => {
+    if (!config) {
+      alert('No configuration to save');
+      return;
+    }
+
+    // Validate configuration
+    const validationError = validateConfig();
+    if (validationError) {
+      alert(`Validation failed: ${validationError}`);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Send the config directly - the backend expects the full config object
+      await SaveBBAppConfig(config.roomId, config as any);
+      setConfigSaved(true);
+      alert('Configuration saved successfully!');
+    } catch (error: any) {
+      alert(`Failed to save configuration: ${error.toString()}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleAddTeam = () => {
     if (!config) return;
 
@@ -106,6 +154,7 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
       ...config,
       teams: [...config.teams, newTeam],
     });
+    setConfigSaved(false);
   };
 
   const handleUpdateTeam = (teamIndex: number, updatedTeam: Team) => {
@@ -117,6 +166,7 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
       ...config,
       teams: updatedTeams,
     });
+    setConfigSaved(false);
   };
 
   const handleRemoveTeam = (teamIndex: number) => {
@@ -132,6 +182,7 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
       ...config,
       teams: updatedTeams,
     });
+    setConfigSaved(false);
   };
 
   return (
@@ -173,12 +224,23 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
         </div>
       )}
 
-      {configLoaded && (
+      {configLoaded && config && (
         <div className="card">
-          <h2>Session Controls</h2>
-          <button disabled={sessionActive}>
-            {sessionActive ? 'Session Active' : 'Start Session'}
-          </button>
+          <div className="action-buttons">
+            <button
+              className="save-config-btn"
+              onClick={handleSaveConfig}
+              disabled={saving || configSaved}
+            >
+              {saving ? 'Saving...' : configSaved ? 'Configuration Saved ✓' : 'Save Configuration'}
+            </button>
+            <button
+              className="start-session-btn"
+              disabled={!configSaved || sessionActive}
+            >
+              {sessionActive ? 'Session Active' : 'Start Session'}
+            </button>
+          </div>
         </div>
       )}
     </div>
