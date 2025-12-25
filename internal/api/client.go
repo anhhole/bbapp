@@ -66,6 +66,11 @@ func (c *Client) SaveConfig(roomId string, config *Config) error {
 		return fmt.Errorf("create request: %w", err)
 	}
 
+	// Set GetBody for retry support
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(jsonData)), nil
+	}
+
 	req.Header.Set("Authorization", "Bearer "+c.authToken)
 	req.Header.Set("Content-Type", "application/json")
 
