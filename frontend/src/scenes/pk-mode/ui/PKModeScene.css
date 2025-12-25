@@ -146,3 +146,25 @@
   cursor: not-allowed;
   color: #666;
 }
+
+.stop-session-btn {
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #f44336;
+  color: white;
+}
+
+.stop-session-btn:hover:not(:disabled) {
+  background: #d32f2f;
+}
+
+.stop-session-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  color: #666;
+}

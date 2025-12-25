@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import './PKModeScene.css';
-import { GetBBAppConfig, InitializeBBCoreClient, GetBBCoreURL, SaveBBAppConfig } from '../../../../wailsjs/go/main/App';
+import { GetBBAppConfig, InitializeBBCoreClient, GetBBCoreURL, SaveBBAppConfig, StartPKSession, StopPKSession } from '../../../../wailsjs/go/main/App';
 import type { PKConfig, Team } from '../../../shared/types';
 import { Plus } from 'lucide-react';
 import { TeamCard } from './components/TeamCard';
@@ -20,6 +20,8 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
   const [configSaved, setConfigSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
+  const [startingSession, setStartingSession] = useState(false);
+  const [stoppingSession, setStoppingSession] = useState(false);
 
   const generateDefaultTemplate = (roomId: string): PKConfig => ({
     roomId,
@@ -131,6 +133,45 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
     }
   };
 
+  const handleStartSession = async () => {
+    if (!config || !configSaved) {
+      alert('Please save the configuration before starting a session');
+      return;
+    }
+
+    setStartingSession(true);
+    try {
+      const bbCoreUrl = await GetBBCoreURL();
+      await StartPKSession(bbCoreUrl, accessToken, config.roomId);
+
+      setSessionActive(true);
+      onSessionChange(true);
+      alert('PK Session started successfully!');
+    } catch (error: any) {
+      alert(`Failed to start session: ${error.toString()}`);
+    } finally {
+      setStartingSession(false);
+    }
+  };
+
+  const handleStopSession = async () => {
+    const confirmed = window.confirm('Are you sure you want to stop the session?');
+    if (!confirmed) return;
+
+    setStoppingSession(true);
+    try {
+      await StopPKSession('USER_STOPPED');
+
+      setSessionActive(false);
+      onSessionChange(false);
+      alert('PK Session stopped successfully!');
+    } catch (error: any) {
+      alert(`Failed to stop session: ${error.toString()}`);
+    } finally {
+      setStoppingSession(false);
+    }
+  };
+
   const handleAddTeam = () => {
     if (!config) return;
 
@@ -194,9 +235,9 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
           placeholder="Room ID"
           value={roomId}
           onChange={(e) => setRoomId(e.target.value)}
-          disabled={configLoaded}
+          disabled={configLoaded || sessionActive}
         />
-        <button onClick={handleLoadConfig} disabled={configLoaded}>
+        <button onClick={handleLoadConfig} disabled={configLoaded || sessionActive}>
           Load Configuration
         </button>
       </div>
@@ -230,16 +271,28 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
             <button
               className="save-config-btn"
               onClick={handleSaveConfig}
-              disabled={saving || configSaved}
+              disabled={saving || configSaved || sessionActive}
             >
               {saving ? 'Saving...' : configSaved ? 'Configuration Saved ✓' : 'Save Configuration'}
             </button>
-            <button
-              className="start-session-btn"
-              disabled={!configSaved || sessionActive}
-            >
-              {sessionActive ? 'Session Active' : 'Start Session'}
-            </button>
+
+            {!sessionActive ? (
+              <button
+                className="start-session-btn"
+                onClick={handleStartSession}
+                disabled={!configSaved || startingSession}
+              >
+                {startingSession ? 'Starting Session...' : 'Start Session'}
+              </button>
+            ) : (
+              <button
+                className="stop-session-btn"
+                onClick={handleStopSession}
+                disabled={stoppingSession}
+              >
+                {stoppingSession ? 'Stopping Session...' : 'Stop Session'}
+              </button>
+            )}
           </div>
         </div>
       )}
