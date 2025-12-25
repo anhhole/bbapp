@@ -108,3 +108,33 @@ func (a *App) AddStreamer(bigoRoomId, teamId, roomId string) error {
 	a.listeners[bigoRoomId] = bigoListener
 	return nil
 }
+
+// RemoveStreamer stops monitoring a streamer
+func (a *App) RemoveStreamer(bigoRoomId string) error {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	if _, exists := a.listeners[bigoRoomId]; !exists {
+		return fmt.Errorf("not monitoring room %s", bigoRoomId)
+	}
+
+	delete(a.listeners, bigoRoomId)
+	// Browser cleanup handled by context cancel
+
+	return nil
+}
+
+// GetConnections returns active connections
+func (a *App) GetConnections() []map[string]string {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
+	var connections []map[string]string
+	for roomId := range a.listeners {
+		connections = append(connections, map[string]string{
+			"bigoRoomId": roomId,
+			"status":     "connected",
+		})
+	}
+	return connections
+}
