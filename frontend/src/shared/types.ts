@@ -26,7 +26,7 @@ export interface Team {
 }
 
 export interface Streamer {
-  streamerId: number | string;
+  streamerId: string;
   bigoId: string;
   bigoRoomId: string;
   name: string;

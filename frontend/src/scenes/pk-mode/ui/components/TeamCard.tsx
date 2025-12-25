@@ -25,7 +25,7 @@ export const TeamCard: React.FC<TeamCardProps> = ({
   };
 
   const handleAddStreamer = () => {
-    const newStreamerId = Date.now();
+    const newStreamerId = `streamer-${Date.now()}`;
     const newStreamer: Streamer = {
       streamerId: newStreamerId,
       bigoId: '',

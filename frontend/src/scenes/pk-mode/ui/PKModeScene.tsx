@@ -33,7 +33,7 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
         bindingGift: 'Rose',
         streamers: [
           {
-            streamerId: 1,
+            streamerId: 'streamer-1',
             bigoId: '',
             bigoRoomId: '',
             name: 'Streamer 1',
@@ -47,7 +47,7 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
         bindingGift: 'Diamond',
         streamers: [
           {
-            streamerId: 2,
+            streamerId: 'streamer-2',
             bigoId: '',
             bigoRoomId: '',
             name: 'Streamer 2',
@@ -190,7 +190,7 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
       bindingGift: 'Rose',
       streamers: [
         {
-          streamerId: Date.now(),
+          streamerId: `streamer-${Date.now()}`,
           bigoId: '',
           bigoRoomId: '',
           name: 'Streamer 1',
