@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"bbapp/internal/browser"
@@ -48,4 +49,15 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.logger != nil {
 		a.logger.Close()
 	}
+}
+
+// ConnectToCore connects to BB-Core STOMP
+func (a *App) ConnectToCore(url, username, password string) error {
+	client, err := stomp.NewClient(url, username, password)
+	if err != nil {
+		return fmt.Errorf("connection failed: %w", err)
+	}
+
+	a.stompClient = client
+	return nil
 }
