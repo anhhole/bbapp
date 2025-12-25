@@ -21,3 +21,22 @@ func TestClient_Connect(t *testing.T) {
 		t.Fatal("Expected non-nil client")
 	}
 }
+
+func TestClient_Publish(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	client, _ := stomp.NewClient("localhost:61613", "", "")
+	defer client.Disconnect()
+
+	payload := map[string]interface{}{
+		"type": "TEST",
+		"data": "hello",
+	}
+
+	err := client.Publish("/app/test", payload)
+	if err != nil {
+		t.Fatalf("Publish failed: %v", err)
+	}
+}

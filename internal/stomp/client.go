@@ -1,6 +1,7 @@
 package stomp
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"time"
@@ -40,4 +41,18 @@ func (c *Client) Disconnect() error {
 		return c.conn.Disconnect()
 	}
 	return nil
+}
+
+// Publish sends message to destination
+func (c *Client) Publish(destination string, payload interface{}) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal failed: %w", err)
+	}
+
+	return c.conn.Send(
+		destination,
+		"application/json",
+		data,
+	)
 }
