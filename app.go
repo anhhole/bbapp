@@ -2,26 +2,50 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"sync"
+
+	"bbapp/internal/browser"
+	"bbapp/internal/listener"
+	"bbapp/internal/logger"
+	"bbapp/internal/stomp"
 )
 
 // App struct
 type App struct {
-	ctx context.Context
+	ctx         context.Context
+	browserMgr  *browser.Manager
+	stompClient *stomp.Client
+	logger      *logger.Logger
+	listeners   map[string]*listener.BigoListener
+	mutex       sync.RWMutex
 }
 
-// NewApp creates a new App application struct
+// NewApp creates new App
 func NewApp() *App {
-	return &App{}
+	return &App{
+		listeners: make(map[string]*listener.BigoListener),
+	}
 }
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
+// startup is called when app starts
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.browserMgr = browser.NewManager()
+
+	// Initialize logger
+	log, err := logger.NewLogger("./logs")
+	if err != nil {
+		panic(err)
+	}
+	a.logger = log
 }
 
-// Greet returns a greeting for the given name
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
+// shutdown is called on app termination
+func (a *App) shutdown(ctx context.Context) {
+	if a.stompClient != nil {
+		a.stompClient.Disconnect()
+	}
+	if a.logger != nil {
+		a.logger.Close()
+	}
 }
