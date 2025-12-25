@@ -33,6 +33,7 @@ type App struct {
 	mutex         sync.RWMutex
 	overlayServer *overlayserver.Server
 	bbCoreURL     string
+	apiClient     *api.Client
 }
 
 // NewApp creates new App
@@ -509,4 +510,30 @@ func (a *App) GetOverlayURL(scene, roomId, token string) string {
 // Defaults to "http://localhost:8080" if not set in .env file.
 func (a *App) GetBBCoreURL() string {
 	return a.bbCoreURL
+}
+
+// InitializeBBCoreClient initializes the API client for BB-Core communication.
+// This must be called before GetBBAppConfig.
+func (a *App) InitializeBBCoreClient(bbCoreUrl, authToken string) error {
+	a.apiClient = api.NewClient(bbCoreUrl, authToken)
+	fmt.Printf("[App] BB-Core API client initialized: %s\n", bbCoreUrl)
+	return nil
+}
+
+// GetBBAppConfig fetches the PK configuration for a specific room from BB-Core.
+// Returns the config or an error if the room doesn't exist (404) or other errors occur.
+func (a *App) GetBBAppConfig(roomId string) (*api.Config, error) {
+	if a.apiClient == nil {
+		return nil, fmt.Errorf("API client not initialized - call InitializeBBCoreClient first")
+	}
+
+	fmt.Printf("[App] Fetching config for room: %s\n", roomId)
+	config, err := a.apiClient.GetConfig(roomId)
+	if err != nil {
+		fmt.Printf("[App] ERROR: Failed to fetch config: %v\n", err)
+		return nil, err
+	}
+
+	fmt.Printf("[App] ✓ Config fetched successfully for room: %s\n", roomId)
+	return config, nil
 }
