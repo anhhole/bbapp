@@ -14,6 +14,18 @@ export function GetConnections() {
   return window['go']['main']['App']['GetConnections']();
 }
 
+export function GetSessionStatus() {
+  return window['go']['main']['App']['GetSessionStatus']();
+}
+
 export function RemoveStreamer(arg1) {
   return window['go']['main']['App']['RemoveStreamer'](arg1);
+}
+
+export function StartPKSession(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartPKSession'](arg1, arg2, arg3);
+}
+
+export function StopPKSession(arg1) {
+  return window['go']['main']['App']['StopPKSession'](arg1);
 }

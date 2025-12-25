@@ -1,5 +1,5 @@
 .container {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 20px;
 }
@@ -18,6 +18,7 @@ input {
   margin: 10px 0;
   border: 1px solid #ddd;
   border-radius: 4px;
+  box-sizing: border-box;
 }
 
 button {
@@ -28,12 +29,71 @@ button {
   border-radius: 4px;
   cursor: pointer;
   width: 100%;
+  font-size: 16px;
+  margin-top: 10px;
 }
 
 button:hover {
   background: #0056b3;
 }
 
-button:disabled {
-  background: #28a745;
+button.stop-button {
+  background: #dc3545;
+}
+
+button.stop-button:hover {
+  background: #c82333;
+}
+
+.connections {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.connection-item {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.connection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.streamer-id {
+  font-weight: bold;
+  color: #333;
+}
+
+.status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.status-connected {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-disconnected {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-error {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.connection-details {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #666;
 }

@@ -5,10 +5,10 @@ import (
 )
 
 type Status struct {
-	RoomId      string
-	SessionId   string
-	IsActive    bool
-	Connections []api.ConnectionStatus
-	StartTime   int64
-	DeviceHash  string
+	RoomId      string                 `json:"roomId"`
+	SessionId   string                 `json:"sessionId"`
+	IsActive    bool                   `json:"isActive"`
+	Connections []api.ConnectionStatus `json:"connections"`
+	StartTime   int64                  `json:"startTime"`
+	DeviceHash  string                 `json:"deviceHash"`
 }
