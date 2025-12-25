@@ -18,3 +18,14 @@ func TestManager_CreateBrowser(t *testing.T) {
 		t.Fatal("Expected non-nil context")
 	}
 }
+
+func TestManager_Navigate(t *testing.T) {
+	manager := browser.NewManager()
+	ctx, cancel, _ := manager.CreateBrowser("nav-test")
+	defer cancel()
+
+	err := manager.Navigate(ctx, "https://example.com")
+	if err != nil {
+		t.Fatalf("Navigate failed: %v", err)
+	}
+}

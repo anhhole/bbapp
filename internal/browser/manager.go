@@ -3,6 +3,7 @@ package browser
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/chromedp/chromedp"
 )
@@ -46,4 +47,12 @@ func (m *Manager) CreateBrowser(id string) (context.Context, context.CancelFunc,
 		cancel()
 		cancelAlloc()
 	}, nil
+}
+
+// Navigate navigates browser to URL
+func (m *Manager) Navigate(ctx context.Context, url string) error {
+	return chromedp.Run(ctx,
+		chromedp.Navigate(url),
+		chromedp.Sleep(2*time.Second), // Wait for page load
+	)
 }
