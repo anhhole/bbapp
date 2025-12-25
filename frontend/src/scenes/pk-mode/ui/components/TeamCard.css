@@ -1,0 +1,162 @@
+.team-card {
+  background: #e3f2fd;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.team-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #bbdefb;
+}
+
+.team-card-header h3 {
+  margin: 0;
+  color: #1976d2;
+  font-size: 18px;
+}
+
+.remove-team-btn {
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s;
+}
+
+.remove-team-btn:hover {
+  background: #d32f2f;
+}
+
+.team-card-body {
+  padding: 20px;
+}
+
+.form-row {
+  margin-bottom: 15px;
+}
+
+.form-row label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.form-row input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #90caf9;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+  background: white;
+}
+
+.form-row input:focus {
+  outline: none;
+  border-color: #1976d2;
+}
+
+.streamers-section {
+  margin-top: 20px;
+}
+
+.streamers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.streamers-header label {
+  font-weight: 600;
+  color: #333;
+  font-size: 15px;
+}
+
+.add-streamer-btn {
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s;
+  font-weight: 500;
+}
+
+.add-streamer-btn:hover {
+  background: #45a049;
+}
+
+.streamers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.streamer-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 15px;
+}
+
+.streamer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.streamer-title {
+  font-weight: 600;
+  color: #555;
+  font-size: 14px;
+}
+
+.remove-streamer-btn {
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s;
+}
+
+.remove-streamer-btn:hover:not(:disabled) {
+  background: #d32f2f;
+}
+
+.remove-streamer-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.streamer-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
