@@ -61,18 +61,20 @@ func (c *Client) SaveConfig(roomId string, config *Config) error {
 		return fmt.Errorf("marshal config: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewReader(jsonData))
+	// Debug logging
+	fmt.Printf("[SaveConfig] URL: %s\n", url)
+	fmt.Printf("[SaveConfig] JSON length: %d bytes\n", len(jsonData))
+	fmt.Printf("[SaveConfig] JSON preview: %s\n", string(jsonData[:min(200, len(jsonData))]))
+
+	// Use the same pattern as other POST methods
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
 
-	// Set GetBody for retry support
-	req.GetBody = func() (io.ReadCloser, error) {
-		return io.NopCloser(bytes.NewReader(jsonData)), nil
-	}
-
 	req.Header.Set("Authorization", "Bearer "+c.authToken)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Length", fmt.Sprintf("%d", len(jsonData)))
 
 	var resp map[string]interface{}
 	return c.doRequest(req, &resp)
