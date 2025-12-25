@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import './PKModeScene.css';
-import { GetBBAppConfig, InitializeBBCoreClient, GetBBCoreURL, SaveBBAppConfig, StartPKSession, StopPKSession } from '../../../../wailsjs/go/main/App';
+import { GetBBAppConfig, InitializeBBCoreClient, GetBBCoreURL, SaveBBAppConfig, StartPKSession, StopPKSession, GetOverlayURL } from '../../../../wailsjs/go/main/App';
 import type { PKConfig, Team } from '../../../shared/types';
 import { Plus } from 'lucide-react';
 import { TeamCard } from './components/TeamCard';
@@ -22,6 +22,7 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
   const [sessionActive, setSessionActive] = useState(false);
   const [startingSession, setStartingSession] = useState(false);
   const [stoppingSession, setStoppingSession] = useState(false);
+  const [overlayUrl, setOverlayUrl] = useState('');
 
   const generateDefaultTemplate = (roomId: string): PKConfig => ({
     roomId,
@@ -146,6 +147,11 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
 
       setSessionActive(true);
       onSessionChange(true);
+
+      // Generate overlay URL
+      const url = await GetOverlayURL('pk-battle', config.roomId, accessToken);
+      setOverlayUrl(url);
+
       alert('PK Session started successfully!');
     } catch (error: any) {
       alert(`Failed to start session: ${error.toString()}`);
@@ -164,6 +170,8 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
 
       setSessionActive(false);
       onSessionChange(false);
+      setOverlayUrl(''); // Clear overlay URL
+
       alert('PK Session stopped successfully!');
     } catch (error: any) {
       alert(`Failed to stop session: ${error.toString()}`);
@@ -226,6 +234,14 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
     setConfigSaved(false);
   };
 
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(overlayUrl).then(() => {
+      alert('Overlay URL copied to clipboard!');
+    }).catch((err) => {
+      alert('Failed to copy URL: ' + err.toString());
+    });
+  };
+
   return (
     <div className="pk-mode-scene">
       <div className="card">
@@ -262,6 +278,29 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
               />
             ))}
           </div>
+        </div>
+      )}
+
+      {sessionActive && overlayUrl && (
+        <div className="card overlay-url-card">
+          <h2>Overlay URL</h2>
+          <p className="overlay-instructions">
+            Copy this URL and add it as a Browser Source in OBS:
+          </p>
+          <div className="overlay-url-container">
+            <input
+              type="text"
+              className="overlay-url-input"
+              value={overlayUrl}
+              readOnly
+            />
+            <button className="copy-url-btn" onClick={handleCopyUrl}>
+              Copy URL
+            </button>
+          </div>
+          <p className="overlay-note">
+            <strong>Note:</strong> The overlay will connect to BB-Core and display real-time PK battle data.
+          </p>
         </div>
       )}
 

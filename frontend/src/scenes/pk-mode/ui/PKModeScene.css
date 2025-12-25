@@ -168,3 +168,66 @@
   cursor: not-allowed;
   color: #666;
 }
+
+.overlay-url-card {
+  background: #fff3e0;
+  border-left: 4px solid #ff9800;
+}
+
+.overlay-url-card h2 {
+  color: #e65100;
+  margin-bottom: 15px;
+}
+
+.overlay-instructions {
+  margin-bottom: 12px;
+  color: #555;
+  font-size: 14px;
+}
+
+.overlay-url-container {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.overlay-url-input {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid #ffb74d;
+  border-radius: 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  background: white;
+  color: #333;
+}
+
+.copy-url-btn {
+  padding: 12px 24px;
+  background: #ff9800;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.copy-url-btn:hover {
+  background: #f57c00;
+}
+
+.overlay-note {
+  margin: 0;
+  padding: 12px;
+  background: #ffe0b2;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #e65100;
+}
+
+.overlay-note strong {
+  font-weight: 600;
+}
