@@ -1,131 +1,96 @@
 import { useState, useEffect } from 'react';
+import { LoginPage } from './components/LoginPage';
+import { SceneTabs } from './components/SceneTabs';
+import { RefreshToken } from '../wailsjs/go/main/App';
+import type { User } from './shared/types';
 import './App.css';
-import { StartPKSession, StopPKSession, GetSessionStatus } from '../wailsjs/go/main/App';
-
-interface ConnectionStatus {
-  bigoRoomId: string;
-  streamerId: string;
-  status: string;
-  messagesReceived: number;
-}
-
-interface SessionStatus {
-  roomId: string;
-  sessionId: string;
-  isActive: boolean;
-  connections: ConnectionStatus[];
-}
 
 function App() {
-  const [bbCoreUrl, setBbCoreUrl] = useState('http://localhost:8080');
-  const [authToken, setAuthToken] = useState('');
-  const [roomId, setRoomId] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [accessToken, setAccessToken] = useState('');
+  const [refreshToken, setRefreshToken] = useState('');
+  const [activeScene, setActiveScene] = useState('pk-mode');
   const [sessionActive, setSessionActive] = useState(false);
-  const [sessionStatus, setSessionStatus] = useState<SessionStatus | null>(null);
 
-  // Poll session status
+  // Token refresh timer
   useEffect(() => {
-    if (!sessionActive) return;
+    if (!isAuthenticated || !refreshToken) return;
 
+    // Refresh token every 50 minutes (assuming 60 min expiry)
     const interval = setInterval(async () => {
       try {
-        const status = await GetSessionStatus();
-        setSessionStatus(status);
+        const response = await RefreshToken(refreshToken);
+        setAccessToken(response.accessToken);
+        setRefreshToken(response.refreshToken);
+        console.log('Token refreshed successfully');
       } catch (error) {
-        console.error('Failed to get session status:', error);
+        console.error('Token refresh failed:', error);
+        handleLogout();
       }
-    }, 5000);
+    }, 50 * 60 * 1000); // 50 minutes
 
     return () => clearInterval(interval);
-  }, [sessionActive]);
+  }, [isAuthenticated, refreshToken]);
 
-  const handleStartSession = async () => {
-    if (!roomId || !authToken) {
-      alert('Please fill in all fields');
-      return;
-    }
-
-    try {
-      await StartPKSession(bbCoreUrl, authToken, roomId);
-      setSessionActive(true);
-      alert('PK Session started successfully!');
-    } catch (error) {
-      alert(`Failed to start session: ${error}`);
-    }
+  const handleLoginSuccess = (
+    newAccessToken: string,
+    newRefreshToken: string,
+    newUser: User
+  ) => {
+    setAccessToken(newAccessToken);
+    setRefreshToken(newRefreshToken);
+    setUser(newUser);
+    setIsAuthenticated(true);
   };
 
-  const handleStopSession = async () => {
-    try {
-      await StopPKSession('USER_STOPPED');
+  const handleLogout = () => {
+    setAccessToken('');
+    setRefreshToken('');
+    setUser(null);
+    setIsAuthenticated(false);
+    setActiveScene('pk-mode');
+    setSessionActive(false);
+  };
+
+  const handleSceneChange = async (newScene: string) => {
+    if (sessionActive) {
+      const confirmed = window.confirm(
+        'Active session detected. You must stop the current session before switching scenes.'
+      );
+      if (!confirmed) return;
+      // TODO: Stop session here
+      // await StopPKSession('USER_SWITCHED_SCENES');
       setSessionActive(false);
-      setSessionStatus(null);
-      alert('PK Session stopped');
-    } catch (error) {
-      alert(`Failed to stop session: ${error}`);
     }
+    setActiveScene(newScene);
   };
+
+  if (!isAuthenticated) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
 
   return (
-    <div className="container">
-      <h1>BBapp - PK Session Manager</h1>
-
-      {!sessionActive ? (
-        <div className="card">
-          <h2>Start PK Session</h2>
-          <input
-            type="text"
-            placeholder="BB-Core URL (e.g., http://localhost:8080)"
-            value={bbCoreUrl}
-            onChange={(e) => setBbCoreUrl(e.target.value)}
-          />
-          <input
-            type="password"
-            placeholder="Authentication Token (required)"
-            value={authToken}
-            onChange={(e) => setAuthToken(e.target.value)}
-          />
-          <input
-            type="text"
-            placeholder="Room ID"
-            value={roomId}
-            onChange={(e) => setRoomId(e.target.value)}
-          />
-          <button onClick={handleStartSession}>Start Session</button>
+    <div className="app">
+      <header className="app-header">
+        <h1>BBapp - PK Session Manager</h1>
+        <div className="user-info">
+          <span>Welcome, {user?.username}</span>
+          <button onClick={handleLogout} className="logout-btn">
+            Logout
+          </button>
         </div>
-      ) : (
-        <>
-          <div className="card">
-            <h2>Session Active</h2>
-            <p><strong>Room ID:</strong> {sessionStatus?.roomId || roomId}</p>
-            <p><strong>Session ID:</strong> {sessionStatus?.sessionId || 'Loading...'}</p>
-            <button onClick={handleStopSession} className="stop-button">
-              Stop Session
-            </button>
-          </div>
+      </header>
 
-          {sessionStatus && sessionStatus.connections && sessionStatus.connections.length > 0 && (
-            <div className="card">
-              <h2>Active Connections</h2>
-              <div className="connections">
-                {sessionStatus.connections.map((conn) => (
-                  <div key={conn.bigoRoomId} className="connection-item">
-                    <div className="connection-header">
-                      <span className="streamer-id">{conn.streamerId}</span>
-                      <span className={`status status-${conn.status.toLowerCase()}`}>
-                        {conn.status}
-                      </span>
-                    </div>
-                    <div className="connection-details">
-                      <span>Bigo Room: {conn.bigoRoomId}</span>
-                      <span>Messages: {conn.messagesReceived}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
+      <SceneTabs activeScene={activeScene} onSceneChange={handleSceneChange}>
+        {activeScene === 'pk-mode' && (
+          <div className="scene-placeholder">
+            <h2>PK Mode</h2>
+            <p>PK Mode UI will be implemented here</p>
+            {/* PKModeScene will be added in next phase */}
+          </div>
+        )}
+      </SceneTabs>
     </div>
   );
 }
