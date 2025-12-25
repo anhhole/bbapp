@@ -4,6 +4,7 @@ import { GetBBAppConfig, InitializeBBCoreClient, GetBBCoreURL, SaveBBAppConfig, 
 import type { PKConfig, Team } from '../../../shared/types';
 import { Plus } from 'lucide-react';
 import { TeamCard } from './components/TeamCard';
+import { api } from '../../../../wailsjs/go/models';
 
 interface PKModeSceneProps {
   accessToken: string;
@@ -123,8 +124,21 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
 
     setSaving(true);
     try {
-      // Send the config directly - the backend expects the full config object
-      await SaveBBAppConfig(config.roomId, config as any);
+      // Ensure proper structure for backend
+      const configToSave = api.Config.createFrom({
+        roomId: config.roomId,
+        agencyId: config.agencyId || 0,  // Default to 0 if undefined
+        session: {
+          sessionId: '',
+          startTime: 0,
+          status: '',
+        },
+        teams: config.teams,
+      });
+
+      console.log('Saving config:', JSON.stringify(configToSave, null, 2));
+
+      await SaveBBAppConfig(config.roomId, configToSave);
       setConfigSaved(true);
       alert('Configuration saved successfully!');
     } catch (error: any) {
