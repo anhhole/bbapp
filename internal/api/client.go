@@ -105,6 +105,53 @@ func (c *Client) SendHeartbeat(roomId string, status HeartbeatRequest) error {
 	return c.doRequest(req, &resp)
 }
 
+// Login authenticates with BB-Core
+func (c *Client) Login(username, password string) (*AuthResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/auth/login", c.baseURL)
+
+	reqBody := LoginRequest{
+		Username: username,
+		Password: password,
+	}
+	jsonData, _ := json.Marshal(reqBody)
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	var resp AuthResponse
+	if err := c.doRequest(req, &resp); err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+// RefreshToken gets a new access token
+func (c *Client) RefreshToken(refreshToken string) (*AuthResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/auth/refresh-token", c.baseURL)
+
+	reqBody := RefreshTokenRequest{RefreshToken: refreshToken}
+	jsonData, _ := json.Marshal(reqBody)
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	var resp AuthResponse
+	if err := c.doRequest(req, &resp); err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
 func (c *Client) doRequest(req *http.Request, result interface{}) error {
 	// Retry logic with exponential backoff
 	maxRetries := 3

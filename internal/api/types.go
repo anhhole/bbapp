@@ -61,3 +61,31 @@ type ConnectionStatus struct {
 	LastMessageTime  int64  `json:"lastMessageTime"`
 	ErrorMessage     string `json:"errorMessage,omitempty"`
 }
+
+// Auth request/response types
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refreshToken"`
+}
+
+type AuthResponse struct {
+	AccessToken  string   `json:"accessToken"`
+	RefreshToken string   `json:"refreshToken"`
+	TokenType    string   `json:"tokenType"`
+	ExpiresIn    int64    `json:"expiresIn"`
+	ExpiresAt    string   `json:"expiresAt"`
+	User         UserInfo `json:"user"`
+}
+
+type UserInfo struct {
+	ID        int64  `json:"id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	RoleCode  string `json:"roleCode"`
+}
