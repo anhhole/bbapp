@@ -61,3 +61,50 @@ func (a *App) ConnectToCore(url, username, password string) error {
 	a.stompClient = client
 	return nil
 }
+
+// AddStreamer adds Bigo streamer to monitor
+func (a *App) AddStreamer(bigoRoomId, teamId, roomId string) error {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	// Check if already exists
+	if _, exists := a.listeners[bigoRoomId]; exists {
+		return fmt.Errorf("already monitoring room %s", bigoRoomId)
+	}
+
+	// Create browser
+	ctx, cancel, err := a.browserMgr.CreateBrowser(bigoRoomId)
+	if err != nil {
+		return err
+	}
+
+	// Create listener
+	bigoListener := listener.NewBigoListener(bigoRoomId, ctx)
+
+	// Setup gift handler
+	bigoListener.OnGift(func(gift listener.Gift) {
+		// Log activity
+		a.logger.LogGift(bigoRoomId, gift.Nickname, gift.GiftName, gift.GiftValue)
+
+		// Send to BB-Core
+		if a.stompClient != nil {
+			payload := map[string]interface{}{
+				"type":      "GIFT",
+				"bigoId":    gift.BigoUid,
+				"nickname":  gift.Nickname,
+				"giftName":  gift.GiftName,
+				"giftValue": gift.GiftValue,
+			}
+			a.stompClient.Publish("/app/room/"+roomId+"/bigo", payload)
+		}
+	})
+
+	// Start listening
+	if err := bigoListener.Start(); err != nil {
+		cancel()
+		return err
+	}
+
+	a.listeners[bigoRoomId] = bigoListener
+	return nil
+}
