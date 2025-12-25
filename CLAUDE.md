@@ -4,16 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BBapp is a Wails v2 desktop application that intercepts Bigo Live WebSocket messages via hidden Chrome browsers and forwards gift/chat events to BB-Core via STOMP messaging.
+BBapp is a Wails v2 desktop application that intercepts Bigo Live WebSocket messages via headless Chrome browsers and forwards gift/chat events to BB-Core via STOMP messaging with session-based lifecycle management.
 
-**Architecture:** Go backend (chromedp for browser automation, STOMP client) + React TypeScript frontend (connection management UI)
+**Architecture:** Go backend (chromedp for browser automation, REST API client, session management, STOMP with auto-reconnection) + React TypeScript frontend (simplified session-based UI)
 
 ## Tech Stack
 
 - **Wails v2:** Go + React framework for desktop apps
 - **chromedp:** Chrome DevTools Protocol for browser control
-- **go-stomp/stomp:** STOMP messaging client
-- **React + TypeScript:** UI layer
+- **go-stomp/stomp:** STOMP messaging client with auto-reconnection
+- **React + TypeScript:** UI layer with real-time status polling
+- **net/http:** REST API client for BB-Core integration
 
 ## Development Commands
 
@@ -46,97 +47,133 @@ wails build -clean
 ### Testing
 
 ```bash
-# Run all tests
-go test ./...
-
-# Run tests with verbose output
-go test ./... -v
+# Run all tests (skip integration tests)
+go test ./... -v -short
 
 # Run specific package tests
-go test ./internal/browser -v
-go test ./internal/listener -v
-go test ./internal/stomp -v
-go test ./internal/logger -v
-
-# Run single test
-go test ./internal/browser -v -run TestManager_CreateBrowser
-
-# Skip integration tests (requires external services)
-go test ./... -short
+go test ./internal/api -v
+go test ./internal/session -v
+go test ./internal/fingerprint -v
+go test ./internal/config -v
 ```
 
-## Architecture
+## Architecture (Post-Advanced Integration)
+
+### Session-Based Workflow
+
+1. User enters Room ID → BB-Core fetches config
+2. Config provides list of streamers → Browsers created automatically
+3. POST /pk/start-from-bbapp called with device hash
+4. Gift/chat events forwarded with complete metadata via STOMP
+5. Heartbeat sent every 30s with connection status
+6. Auto-reconnection for STOMP and browsers
+7. POST /pk/stop-from-bbapp called on session end
 
 ### Core Components
 
-**internal/browser/manager.go**
-- Manages headless Chrome instances using chromedp
-- Creates isolated browser contexts per Bigo room
-- Each browser instance navigates to a Bigo Live room and intercepts WebSocket frames
-- Browser lifecycle tied to monitoring session
+**internal/api/client.go**
+- BB-Core REST API client with retry logic (exponential backoff)
+- Methods: GetConfig, StartSession, StopSession, SendHeartbeat
+- 10s timeout, 3 retries with 1s, 2s, 4s delays
+- Bearer token authentication
+
+**internal/fingerprint/device.go**
+- Generates deterministic device hash for trial validation
+- SHA-256 hash based on hostname + OS + architecture
+- Cached for performance (consistent across app lifetime)
+
+**internal/config/manager.go**
+- Fast streamer lookup with O(1) indexes
+- Maps BigoRoomId → Streamer and StreamerId → Streamer
+- GetAllBigoRoomIds() returns all configured rooms
+
+**internal/session/manager.go**
+- Session lifecycle orchestration
+- Start(roomId) - Fetches config, calls BB-Core start-session API
+- Stop(reason) - Gracefully stops session
+- UpdateConnectionStatus() - Tracks per-streamer health
+- Thread-safe with RWMutex
+
+**internal/session/heartbeat.go**
+- 30s interval heartbeat to BB-Core
+- Sends connection status for all streamers
+- Goroutine-based with graceful shutdown
 
 **internal/listener/bigo.go**
-- Listens to WebSocket frames from Bigo Live via Chrome DevTools Protocol
-- Parses gift and chat events from intercepted WebSocket messages
-- Uses chromedp's `ListenTarget` with `network.EventWebSocketFrameReceived`
-- Invokes registered handlers when events are detected
-
-**internal/listener/websocket.go**
-- Generic WebSocket frame handler abstraction
-- Supports multiple registered handlers per listener
-- Thread-safe handler registration and invocation
+- Enhanced protocol parsing (gifts + chat + all fields)
+- BigoGift: sender info, receiver info, gift details, metadata
+- BigoChat: sender info, message, timestamp
+- Debug mode with frame capture to file
+- Health monitoring (IsHealthy checks frame reception)
 
 **internal/stomp/client.go**
-- STOMP client wrapper for BB-Core communication
-- Connects to BB-Core message broker
-- Publishes gift/chat events to `/app/room/{roomId}/bigo` destination
-- JSON serialization of event payloads
-
-**internal/logger/logger.go**
-- File-based activity logging (JSONL format)
-- Creates daily log files: `bbapp_YYYY-MM-DD.jsonl`
-- Logs all gift events with timestamp, type, and metadata
-- Stored in `./logs` directory
+- Auto-reconnecting STOMP client
+- Health monitoring every 10s
+- Reconnection with exponential backoff (max 5 attempts)
+- Thread-safe with RWMutex
+- Supports both TCP and WebSocket transport
 
 **app.go (Wails App)**
-- Main application orchestration layer
-- Manages lifecycle of browsers, listeners, STOMP client, and logger
-- Exposes methods to React frontend via Wails bindings:
-  - `ConnectToCore(url, username, password)` - Connect to BB-Core STOMP
-  - `AddStreamer(bigoRoomId, teamId, roomId)` - Start monitoring a Bigo room
-  - `RemoveStreamer(bigoRoomId)` - Stop monitoring a room
-  - `GetConnections()` - List active monitoring sessions
+- Session-based workflow methods:
+  - `StartPKSession(bbCoreUrl, authToken, roomId)` - Complete session init
+  - `StopPKSession(reason)` - Graceful session teardown
+  - `GetSessionStatus()` - Returns current session state
+- Legacy methods (backward compatible):
+  - `ConnectToCore()`, `AddStreamer()`, `RemoveStreamer()`
 
 ### Data Flow
 
-1. Hidden Chrome browser navigates to Bigo room URL (`https://www.bigo.tv/{roomId}`)
-2. chromedp intercepts WebSocket frames via DevTools Protocol
-3. BigoListener parses gift events from JSON payloads
-4. Gift handler logs event to file AND forwards to BB-Core via STOMP
-5. BB-Core receives message on `/app/room/{roomId}/bigo` destination
+1. User clicks "Start Session" with Room ID
+2. BBapp calls BB-Core GET /bbapp-config/{roomId}
+3. BBapp calls BB-Core POST /pk/start-from-bbapp/{roomId} with device hash
+4. For each streamer in config:
+   - Create headless Chrome browser
+   - Navigate to https://www.bigo.tv/{bigoRoomId}
+   - Intercept WebSocket frames via chromedp
+5. Parse gift/chat events from frames
+6. Forward to BB-Core via STOMP with complete payload
+7. Send heartbeat every 30s with connection status
+8. Auto-reconnect STOMP/browsers if disconnected
+9. User clicks "Stop Session" → cleanup all resources
 
-### Event Message Format
+### Enhanced Message Formats
 
-Gift events forwarded to BB-Core:
+**Gift Event (STOMP):**
 ```json
 {
   "type": "GIFT",
-  "bigoId": "string",
-  "nickname": "string",
-  "giftName": "string",
-  "giftValue": 123
+  "roomId": "abc123",
+  "bigoRoomId": "room123",
+  "senderId": "sender1",
+  "senderName": "Bob",
+  "senderAvatar": "https://...",
+  "senderLevel": 25,
+  "streamerId": "s1",
+  "streamerName": "Alice",
+  "streamerAvatar": "https://...",
+  "giftId": "g1",
+  "giftName": "Rose",
+  "giftCount": 1,
+  "diamonds": 100,
+  "giftImageUrl": "https://...",
+  "timestamp": 1234567890,
+  "deviceHash": "abc123..."
 }
 ```
 
-Activity log entries:
+**Chat Message (STOMP):**
 ```json
 {
+  "type": "CHAT",
+  "roomId": "abc123",
+  "bigoRoomId": "room123",
+  "senderId": "sender1",
+  "senderName": "Bob",
+  "senderAvatar": "https://...",
+  "senderLevel": 25,
+  "message": "Hello!",
   "timestamp": 1234567890,
-  "type": "GIFT",
-  "bigoRoomId": "12345",
-  "nickname": "username",
-  "giftName": "Rose",
-  "value": 100
+  "deviceHash": "abc123..."
 }
 ```
 
@@ -150,32 +187,47 @@ This project follows Test-Driven Development (TDD):
 4. **Run test to verify pass** - Confirm implementation works
 5. **Commit** - Save working increment
 
-Integration tests that require external services (STOMP server, live Bigo streams) should use `testing.Short()` check and skip when unavailable.
+Integration tests require BB-Core running. Use `-short` flag to skip them during development.
 
 ## Implementation Notes
 
-- Each Bigo room gets its own isolated browser context
-- Browsers run headless with `--no-sandbox --disable-gpu` flags
-- STOMP connection is shared across all monitored rooms
-- Logger creates new file daily, appends to existing file within same day
-- Frontend communicates with Go backend via Wails IPC (auto-generated bindings in `frontend/wailsjs/`)
-- Context cancellation cascades to clean up browser resources
+- **Session-based:** Single StartPKSession creates all browsers from config
+- **Device fingerprinting:** Stable hash for trial validation
+- **Auto-reconnection:** STOMP monitors health every 10s, reconnects automatically
+- **Heartbeat:** Every 30s to BB-Core with connection status
+- **Enhanced parsing:** Full gift/chat metadata captured
+- **Thread-safe:** All managers use RWMutex for concurrent access
+- **Frontend bindings:** Auto-generated by Wails in `frontend/wailsjs/`
+- **JSON tags:** Required on Go structs for proper TypeScript generation
 
 ## Development Workflow
 
 When implementing new features:
 
-1. Create package structure in `internal/`
-2. Write test file (`*_test.go`) with expected behavior
-3. Run test to verify failure
-4. Implement minimal code to pass test
-5. Verify with `go test ./...`
-6. Build with `wails build` to ensure integration works
-7. Test in dev mode with `wails dev`
+1. Check if plan exists in `docs/plans/`
+2. Follow TDD: write test → run (fail) → implement → run (pass) → commit
+3. For REST endpoints, add to `internal/api/client.go`
+4. For session logic, add to `internal/session/manager.go`
+5. Build with `wails build` to ensure frontend bindings generate
+6. Test in dev mode with `wails dev`
 
-## Known Constraints
+## Recent Enhancements
 
-- Requires Chrome/Chromium installed on system (chromedp dependency)
-- STOMP connection requires BB-Core to be running and accessible
-- Bigo Live WebSocket message format is reverse-engineered and may change
-- No automatic reconnection on WebSocket disconnect (MVP limitation)
+- ✅ REST API client for BB-Core
+- ✅ Device fingerprinting
+- ✅ Configuration manager
+- ✅ Enhanced BigoGift struct (all fields)
+- ✅ Chat message support
+- ✅ Session manager
+- ✅ Heartbeat service (30s)
+- ✅ STOMP auto-reconnection
+- ✅ Session-based UI workflow
+- ✅ Connection health dashboard
+
+## Known Features
+
+- STOMP auto-reconnects with exponential backoff
+- Browser health monitoring (recreates if no frames for 30s)
+- Device fingerprinting for trial validation
+- Complete gift/chat metadata forwarding
+- Real-time connection status in UI

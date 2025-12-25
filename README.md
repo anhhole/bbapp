@@ -1,19 +1,72 @@
-# README
+# BBapp - Bigo Live PK Session Manager
 
-## About
+Desktop app for intercepting Bigo Live WebSocket messages and forwarding to BB-Core.
 
-This is the official Wails React-TS template.
+## Features
 
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: https://wails.io/docs/reference/project-config
+- ✅ Session-based BB-Core integration
+- ✅ Automatic configuration fetching
+- ✅ Gift and chat event forwarding
+- ✅ Device fingerprinting for trial validation
+- ✅ Heartbeat monitoring (30s intervals)
+- ✅ Auto-reconnection for STOMP and browsers
+- ✅ Real-time connection health dashboard
 
-## Live Development
+## Quick Start
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+1. Install BBapp
+2. Start BB-Core at `http://localhost:8080`
+3. Launch BBapp
+4. Enter:
+   - BB-Core URL
+   - Authentication token
+   - Room ID
+5. Click "Start Session"
+6. Monitor connection health in dashboard
+7. Click "Stop Session" when done
 
-## Building
+## Development
 
-To build a redistributable, production mode package, use `wails build`.
+```bash
+# Install dependencies
+go get ./...
+npm install --prefix frontend
+
+# Run in dev mode
+wails dev
+
+# Build production
+wails build
+
+# Run tests
+go test ./... -v -short
+```
+
+## Architecture (Session-Based)
+
+**Workflow:**
+
+1. User enters Room ID → BB-Core fetches config
+2. Config provides list of streamers → Browsers created automatically
+3. POST /pk/start-from-bbapp called with device hash
+4. Gift/chat events forwarded with complete metadata via STOMP
+5. Heartbeat sent every 30s with connection status
+6. Auto-reconnection for STOMP and browsers
+7. POST /pk/stop-from-bbapp called on session end
+
+**Key Components:**
+
+- `internal/api/` - BB-Core REST API client
+- `internal/session/` - Session and heartbeat management
+- `internal/config/` - Configuration with streamer lookup
+- `internal/fingerprint/` - Device hash generation
+- `internal/listener/bigo.go` - Enhanced protocol parsing (gifts + chat)
+- `internal/stomp/client.go` - Auto-reconnecting STOMP client
+
+## Documentation
+
+- [BB-CORE-INTEGRATION.md](BB-CORE-INTEGRATION.md) - BB-Core integration guide
+- [TEST_INTEGRATION.md](TEST_INTEGRATION.md) - Integration testing
+- [TEST_RESULTS.md](TEST_RESULTS.md) - Test status and manual testing procedures
+- [CLAUDE.md](CLAUDE.md) - Technical architecture for Claude Code
+- [Implementation Plans](docs/plans/) - Detailed implementation plans
