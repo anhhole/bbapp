@@ -49,7 +49,14 @@ func (c *Client) GetConfig(roomId string) (*Config, error) {
 func (c *Client) SaveConfig(roomId string, config *Config) error {
 	url := fmt.Sprintf("%s/api/v1/stream/rooms/%s/bbapp-config", c.baseURL, roomId)
 
-	jsonData, err := json.Marshal(config)
+	// Wrap config in BbappConfigRequest structure
+	requestBody := map[string]interface{}{
+		"configData":  config,
+		"description": "BBapp PK Mode Configuration",
+		"isActive":    true,
+	}
+
+	jsonData, err := json.Marshal(requestBody)
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
