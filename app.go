@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 
@@ -11,21 +12,26 @@ import (
 	"bbapp/internal/fingerprint"
 	"bbapp/internal/listener"
 	"bbapp/internal/logger"
+	"bbapp/internal/overlayserver"
 	"bbapp/internal/session"
 	"bbapp/internal/stomp"
+
+	"github.com/joho/godotenv"
 )
 
 // App struct
 type App struct {
-	ctx         context.Context
-	browserMgr  *browser.Manager
-	stompClient *stomp.Client
-	logger      *logger.Logger
-	listeners   map[string]*listener.BigoListener
-	session     *session.Manager
-	heartbeat   *session.Heartbeat
-	deviceHash  string
-	mutex       sync.RWMutex
+	ctx           context.Context
+	browserMgr    *browser.Manager
+	stompClient   *stomp.Client
+	logger        *logger.Logger
+	listeners     map[string]*listener.BigoListener
+	session       *session.Manager
+	heartbeat     *session.Heartbeat
+	deviceHash    string
+	mutex         sync.RWMutex
+	overlayServer *overlayserver.Server
+	bbCoreURL     string
 }
 
 // NewApp creates new App
@@ -39,26 +45,53 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	fmt.Println("[App] BBapp starting up...")
-	
+
+	// Load .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("No .env file found, using defaults")
+	}
+
+	// Get BB-Core URL from environment
+	bbCoreURL := os.Getenv("BB_CORE_URL")
+	if bbCoreURL == "" {
+		bbCoreURL = "http://localhost:8080"
+	}
+	a.bbCoreURL = bbCoreURL
+
+	// Start overlay HTTP server
+	server, err := overlayserver.NewServer()
+	if err != nil {
+		log.Fatal("Failed to start overlay server:", err)
+	}
+	a.overlayServer = server
+
+	// Start server in background
+	go func() {
+		if err := server.Start(); err != nil {
+			log.Printf("Overlay server error: %v", err)
+		}
+	}()
+
 	a.browserMgr = browser.NewManager()
 	fmt.Println("[App] Browser manager initialized")
 
 	// Initialize logger
-	log, err := logger.NewLogger("./logs")
+	logger, err := logger.NewLogger("./logs")
 	if err != nil {
 		fmt.Printf("[App] ERROR: Failed to initialize logger: %v\n", err)
 		panic(err)
 	}
-	a.logger = log
+	a.logger = logger
 	fmt.Println("[App] Activity logger initialized (logs will be written to ./logs)")
-	
+
 	// Create debug frames directory
 	if err := os.MkdirAll("./debug_frames", 0755); err != nil {
 		fmt.Printf("[App] WARNING: Could not create debug_frames directory: %v\n", err)
 	} else {
 		fmt.Println("[App] Debug frames directory ready (./debug_frames)")
 	}
-	
+
 	fmt.Println("[App] Startup complete - ready to connect to BB-Core")
 }
 
@@ -434,4 +467,28 @@ func (a *App) addBigoListenerForSession(bigoRoomId, roomId string) error {
 
 	a.listeners[bigoRoomId] = bigoListener
 	return nil
+}
+
+// Login authenticates with BB-Core
+func (a *App) Login(username, password string) (*api.AuthResponse, error) {
+	client := api.NewClient(a.bbCoreURL, "")
+	return client.Login(username, password)
+}
+
+// RefreshToken gets a new access token
+func (a *App) RefreshToken(refreshToken string) (*api.AuthResponse, error) {
+	client := api.NewClient(a.bbCoreURL, "")
+	return client.RefreshToken(refreshToken)
+}
+
+// GetOverlayURL generates the overlay URL for OBS
+func (a *App) GetOverlayURL(scene, roomId, token string) string {
+	baseURL := a.overlayServer.GetURL()
+	return fmt.Sprintf("%s/overlay?scene=%s&roomId=%s&bbCoreUrl=%s&token=%s",
+		baseURL, scene, roomId, a.bbCoreURL, token)
+}
+
+// GetBBCoreURL returns the configured BB-Core URL
+func (a *App) GetBBCoreURL() string {
+	return a.bbCoreURL
 }

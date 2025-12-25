@@ -10,12 +10,28 @@ export function ConnectToCore(arg1, arg2, arg3) {
   return window['go']['main']['App']['ConnectToCore'](arg1, arg2, arg3);
 }
 
+export function GetBBCoreURL() {
+  return window['go']['main']['App']['GetBBCoreURL']();
+}
+
 export function GetConnections() {
   return window['go']['main']['App']['GetConnections']();
 }
 
+export function GetOverlayURL(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetOverlayURL'](arg1, arg2, arg3);
+}
+
 export function GetSessionStatus() {
   return window['go']['main']['App']['GetSessionStatus']();
+}
+
+export function Login(arg1, arg2) {
+  return window['go']['main']['App']['Login'](arg1, arg2);
+}
+
+export function RefreshToken(arg1) {
+  return window['go']['main']['App']['RefreshToken'](arg1);
 }
 
 export function RemoveStreamer(arg1) {
