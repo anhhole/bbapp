@@ -46,3 +46,57 @@
   background: #ccc;
   cursor: not-allowed;
 }
+
+.teams-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.teams-header h2 {
+  margin: 0;
+}
+
+.add-team-btn {
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s;
+  font-weight: 500;
+}
+
+.add-team-btn:hover {
+  background: #45a049;
+}
+
+.teams-list {
+  max-height: 600px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.teams-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.teams-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.teams-list::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.teams-list::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

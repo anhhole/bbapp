@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import './PKModeScene.css';
 import { GetBBAppConfig, InitializeBBCoreClient, GetBBCoreURL } from '../../../../wailsjs/go/main/App';
-import type { PKConfig } from '../../../shared/types';
+import type { PKConfig, Team } from '../../../shared/types';
+import { Plus } from 'lucide-react';
+import { TeamCard } from './components/TeamCard';
 
 interface PKModeSceneProps {
   accessToken: string;
@@ -81,6 +83,57 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
     }
   };
 
+  const handleAddTeam = () => {
+    if (!config) return;
+
+    const newTeamId = `team-${Date.now()}`;
+    const newTeam: Team = {
+      teamId: newTeamId,
+      name: `Team ${config.teams.length + 1}`,
+      bindingGift: 'Rose',
+      streamers: [
+        {
+          streamerId: Date.now(),
+          bigoId: '',
+          bigoRoomId: '',
+          name: 'Streamer 1',
+          bindingGift: 'Rose',
+        },
+      ],
+    };
+
+    setConfig({
+      ...config,
+      teams: [...config.teams, newTeam],
+    });
+  };
+
+  const handleUpdateTeam = (teamIndex: number, updatedTeam: Team) => {
+    if (!config) return;
+
+    const updatedTeams = [...config.teams];
+    updatedTeams[teamIndex] = updatedTeam;
+    setConfig({
+      ...config,
+      teams: updatedTeams,
+    });
+  };
+
+  const handleRemoveTeam = (teamIndex: number) => {
+    if (!config) return;
+
+    if (config.teams.length <= 1) {
+      alert('Cannot remove the last team. At least one team is required.');
+      return;
+    }
+
+    const updatedTeams = config.teams.filter((_, index) => index !== teamIndex);
+    setConfig({
+      ...config,
+      teams: updatedTeams,
+    });
+  };
+
   return (
     <div className="pk-mode-scene">
       <div className="card">
@@ -97,10 +150,26 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
         </button>
       </div>
 
-      {configLoaded && (
+      {configLoaded && config && (
         <div className="card">
-          <h2>Configuration</h2>
-          <p>Team editor will be added here</p>
+          <div className="teams-header">
+            <h2>Teams Configuration</h2>
+            <button className="add-team-btn" onClick={handleAddTeam}>
+              <Plus size={16} /> Add Team
+            </button>
+          </div>
+
+          <div className="teams-list">
+            {config.teams.map((team, index) => (
+              <TeamCard
+                key={team.teamId}
+                team={team}
+                onUpdateTeam={(updatedTeam) => handleUpdateTeam(index, updatedTeam)}
+                onRemoveTeam={() => handleRemoveTeam(index)}
+                canRemove={config.teams.length > 1}
+              />
+            ))}
+          </div>
         </div>
       )}
 
