@@ -1,28 +1,80 @@
-import {useState} from 'react';
-import logo from './assets/images/logo-universal.png';
+import { useState } from 'react';
 import './App.css';
-import {Greet} from "../wailsjs/go/main/App";
+import { ConnectToCore, AddStreamer, RemoveStreamer } from '../wailsjs/go/main/App';
 
 function App() {
-    const [resultText, setResultText] = useState("Please enter your name below 👇");
-    const [name, setName] = useState('');
-    const updateName = (e: any) => setName(e.target.value);
-    const updateResultText = (result: string) => setResultText(result);
+  const [coreUrl, setCoreUrl] = useState('localhost:61613');
+  const [connected, setConnected] = useState(false);
 
-    function greet() {
-        Greet(name).then(updateResultText);
+  const [bigoRoomId, setBigoRoomId] = useState('');
+  const [teamId, setTeamId] = useState('');
+  const [roomId, setRoomId] = useState('');
+
+  const handleConnect = async () => {
+    try {
+      await ConnectToCore(coreUrl, '', '');
+      setConnected(true);
+      alert('Connected to BB-Core!');
+    } catch (error) {
+      alert(`Failed: ${error}`);
+    }
+  };
+
+  const handleAddStreamer = async () => {
+    if (!bigoRoomId || !teamId || !roomId) {
+      alert('Fill all fields');
+      return;
     }
 
-    return (
-        <div id="App">
-            <img src={logo} id="logo" alt="logo"/>
-            <div id="result" className="result">{resultText}</div>
-            <div id="input" className="input-box">
-                <input id="name" className="input" onChange={updateName} autoComplete="off" name="input" type="text"/>
-                <button className="btn" onClick={greet}>Greet</button>
-            </div>
+    try {
+      await AddStreamer(bigoRoomId, teamId, roomId);
+      alert('Streamer added!');
+      setBigoRoomId('');
+    } catch (error) {
+      alert(`Failed: ${error}`);
+    }
+  };
+
+  return (
+    <div className="container">
+      <h1>BBapp - Bigo Stream Manager</h1>
+
+      <div className="card">
+        <h2>BB-Core Connection</h2>
+        <input
+          type="text"
+          placeholder="STOMP URL"
+          value={coreUrl}
+          onChange={(e) => setCoreUrl(e.target.value)}
+        />
+        <button onClick={handleConnect} disabled={connected}>
+          {connected ? '✓ Connected' : 'Connect'}
+        </button>
+      </div>
+
+      {connected && (
+        <div className="card">
+          <h2>Add Streamer</h2>
+          <input
+            placeholder="Bigo Room ID"
+            value={bigoRoomId}
+            onChange={(e) => setBigoRoomId(e.target.value)}
+          />
+          <input
+            placeholder="Team ID (UUID)"
+            value={teamId}
+            onChange={(e) => setTeamId(e.target.value)}
+          />
+          <input
+            placeholder="Room ID"
+            value={roomId}
+            onChange={(e) => setRoomId(e.target.value)}
+          />
+          <button onClick={handleAddStreamer}>Add</button>
         </div>
-    )
+      )}
+    </div>
+  );
 }
 
-export default App
+export default App;
