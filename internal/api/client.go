@@ -72,9 +72,13 @@ func (c *Client) SaveConfig(roomId string, config *Config) error {
 		return fmt.Errorf("create request: %w", err)
 	}
 
+	// Enable request body recreation for retries
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(jsonData)), nil
+	}
+
 	req.Header.Set("Authorization", "Bearer "+c.authToken)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Length", fmt.Sprintf("%d", len(jsonData)))
 
 	var resp map[string]interface{}
 	return c.doRequest(req, &resp)
@@ -211,6 +215,15 @@ func (c *Client) doRequest(req *http.Request, result interface{}) error {
 	baseDelay := 1 * time.Second
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
+		// Recreate request body for retries if GetBody is available
+		if attempt > 0 && req.GetBody != nil {
+			body, err := req.GetBody()
+			if err != nil {
+				return fmt.Errorf("failed to recreate request body: %w", err)
+			}
+			req.Body = body
+		}
+
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			if attempt < maxRetries-1 {
