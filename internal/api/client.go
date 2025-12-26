@@ -11,9 +11,10 @@ import (
 )
 
 type Client struct {
-	baseURL    string
-	authToken  string
-	httpClient *http.Client
+	baseURL      string
+	authToken    string
+	refreshToken string
+	httpClient   *http.Client
 }
 
 func NewClient(baseURL, authToken string) *Client {
@@ -24,6 +25,12 @@ func NewClient(baseURL, authToken string) *Client {
 			Timeout: 10 * time.Second,
 		},
 	}
+}
+
+// SetTokens updates both access and refresh tokens
+func (c *Client) SetTokens(accessToken, refreshToken string) {
+	c.authToken = accessToken
+	c.refreshToken = refreshToken
 }
 
 func (c *Client) GetConfig(roomId string) (*Config, error) {
@@ -308,6 +315,63 @@ func (c *Client) doRequest(req *http.Request, result interface{}) error {
 			// Try to parse as APIError
 			var apiErr APIError
 			if err := json.Unmarshal(body, &apiErr); err == nil && apiErr.ErrorCode != 0 {
+				// Check for token expired (401 with error code 2003)
+				// Only attempt auto-refresh if we have a refresh token
+				if resp.StatusCode == 401 && apiErr.ErrorCode == 2003 && c.refreshToken != "" {
+					// Attempt token refresh
+					authResp, refreshErr := c.RefreshToken(c.refreshToken)
+					if refreshErr != nil {
+						// Refresh failed, return original error
+						return &apiErr
+					}
+
+					// Update tokens
+					c.SetTokens(authResp.AccessToken, authResp.RefreshToken)
+
+					// Retry original request with new token
+					// Recreate request body if available
+					if req.GetBody != nil {
+						newBody, bodyErr := req.GetBody()
+						if bodyErr != nil {
+							return fmt.Errorf("failed to recreate request body for retry: %w", bodyErr)
+						}
+						req.Body = newBody
+					}
+
+					// Update Authorization header with new token
+					req.Header.Set("Authorization", "Bearer "+c.authToken)
+
+					// Retry the request once
+					retryResp, retryErr := c.httpClient.Do(req)
+					if retryErr != nil {
+						return fmt.Errorf("request failed after token refresh: %w", retryErr)
+					}
+					defer retryResp.Body.Close()
+
+					retryBody, retryErr := io.ReadAll(retryResp.Body)
+					if retryErr != nil {
+						return fmt.Errorf("read response after refresh: %w", retryErr)
+					}
+
+					// Check if retry succeeded
+					if retryResp.StatusCode >= 400 {
+						// Parse error from retry
+						var retryApiErr APIError
+						if err := json.Unmarshal(retryBody, &retryApiErr); err == nil && retryApiErr.ErrorCode != 0 {
+							return &retryApiErr
+						}
+						return fmt.Errorf("HTTP %d after refresh: %s", retryResp.StatusCode, string(retryBody))
+					}
+
+					// Success - unmarshal result
+					if result != nil {
+						if err := json.Unmarshal(retryBody, result); err != nil {
+							return fmt.Errorf("unmarshal response after refresh: %w", err)
+						}
+					}
+					return nil
+				}
+
 				return &apiErr
 			}
 
