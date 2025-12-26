@@ -1,5 +1,7 @@
 package api
 
+import "time"
+
 type Config struct {
 	RoomId   string       `json:"roomId"`
 	AgencyId int          `json:"agencyId"`
@@ -62,30 +64,57 @@ type ConnectionStatus struct {
 	ErrorMessage     string `json:"errorMessage,omitempty"`
 }
 
-// Auth request/response types
+// Authentication Types
+
+// LoginRequest is the request body for login
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
+// RegisterRequest is the request body for registration
+type RegisterRequest struct {
+	Username   string `json:"username"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	FirstName  string `json:"firstName,omitempty"`
+	LastName   string `json:"lastName,omitempty"`
+	AgencyName string `json:"agencyName"`
+}
+
+// RefreshTokenRequest is the request body for token refresh
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
+// AuthResponse is the response from login/register/refresh
 type AuthResponse struct {
-	AccessToken  string   `json:"accessToken"`
-	RefreshToken string   `json:"refreshToken"`
-	TokenType    string   `json:"tokenType"`
-	ExpiresIn    int64    `json:"expiresIn"`
-	ExpiresAt    string   `json:"expiresAt"`
-	User         UserInfo `json:"user"`
+	AccessToken  string    `json:"accessToken"`
+	RefreshToken string    `json:"refreshToken"`
+	TokenType    string    `json:"tokenType"`
+	ExpiresIn    int64     `json:"expiresIn"`
+	ExpiresAt    time.Time `json:"expiresAt"`
+	User         User      `json:"user"`
+	Agency       Agency    `json:"agency"`
 }
 
-type UserInfo struct {
+// User represents authenticated user info
+type User struct {
 	ID        int64  `json:"id"`
 	Username  string `json:"username"`
 	Email     string `json:"email"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
+	FirstName string `json:"firstName,omitempty"`
+	LastName  string `json:"lastName,omitempty"`
 	RoleCode  string `json:"roleCode"`
+}
+
+// Agency represents user's agency info
+type Agency struct {
+	ID           int64     `json:"id"`
+	Name         string    `json:"name"`
+	Plan         string    `json:"plan"` // TRIAL, PAID, PROFESSIONAL, ENTERPRISE
+	Status       string    `json:"status"`
+	MaxRooms     int       `json:"maxRooms"`
+	CurrentRooms int       `json:"currentRooms"`
+	ExpiresAt    time.Time `json:"expiresAt"`
 }
