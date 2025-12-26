@@ -10,8 +10,14 @@ import (
 func TestClient_GetConfig(t *testing.T) {
 	// Mock BB-Core server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/bbapp-config/test-room" {
-			t.Errorf("Expected /bbapp-config/test-room, got %s", r.URL.Path)
+		// Verify new official endpoint
+		if r.URL.Path != "/api/v1/external/config" {
+			t.Errorf("Expected /api/v1/external/config, got %s", r.URL.Path)
+		}
+
+		// Verify Authorization header
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("Expected Bearer token, got %s", r.Header.Get("Authorization"))
 		}
 
 		w.Header().Set("Content-Type", "application/json")

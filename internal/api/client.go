@@ -34,7 +34,8 @@ func (c *Client) SetTokens(accessToken, refreshToken string) {
 }
 
 func (c *Client) GetConfig(roomId string) (*Config, error) {
-	url := fmt.Sprintf("%s/bbapp-config/%s", c.baseURL, roomId)
+	// Migrated to official BB-Core API endpoint
+	url := fmt.Sprintf("%s/api/v1/external/config", c.baseURL)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -54,7 +55,8 @@ func (c *Client) GetConfig(roomId string) (*Config, error) {
 
 // SaveConfig saves room configuration to BB-Core
 func (c *Client) SaveConfig(roomId string, config *Config) error {
-	url := fmt.Sprintf("%s/api/v1/stream/rooms/%s/bbapp-config", c.baseURL, roomId)
+	// Migrated to official BB-Core API endpoint
+	url := fmt.Sprintf("%s/api/v1/external/config", c.baseURL)
 
 	// Wrap config in BbappConfigRequest structure
 	requestBody := map[string]interface{}{
