@@ -277,3 +277,118 @@ func TestManager_UpdateProfile_NotFound(t *testing.T) {
 		t.Error("UpdateProfile() should return error for non-existent profile")
 	}
 }
+
+func TestManager_DeleteProfile_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	mgr := NewManager(tmpDir)
+
+	// Create a profile
+	created, err := mgr.CreateProfile("Test Profile", "room-123", testConfig())
+	if err != nil {
+		t.Fatalf("CreateProfile() error = %v", err)
+	}
+
+	// Delete the profile
+	if err := mgr.DeleteProfile(created.ID); err != nil {
+		t.Fatalf("DeleteProfile() error = %v", err)
+	}
+
+	// Verify profile is gone from memory
+	if len(mgr.profiles) != 0 {
+		t.Errorf("profiles map should be empty, got %d profiles", len(mgr.profiles))
+	}
+
+	// Verify profile is gone from disk
+	mgr2 := NewManager(tmpDir)
+	if len(mgr2.profiles) != 0 {
+		t.Errorf("reloaded profiles should be empty, got %d profiles", len(mgr2.profiles))
+	}
+}
+
+func TestManager_DeleteProfile_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	mgr := NewManager(tmpDir)
+
+	// Try to delete non-existent profile
+	err := mgr.DeleteProfile("non-existent-id")
+	if err == nil {
+		t.Error("DeleteProfile() should return error for non-existent profile")
+	}
+}
+
+func TestManager_ListProfiles_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+	mgr := NewManager(tmpDir)
+
+	profiles := mgr.ListProfiles()
+	if len(profiles) != 0 {
+		t.Errorf("ListProfiles() should return empty list, got %d profiles", len(profiles))
+	}
+}
+
+func TestManager_ListProfiles_SortedByLastUsedAt(t *testing.T) {
+	tmpDir := t.TempDir()
+	mgr := NewManager(tmpDir)
+
+	// Create three profiles
+	p1, _ := mgr.CreateProfile("Profile 1", "room-1", testConfig())
+	time.Sleep(10 * time.Millisecond)
+	p2, _ := mgr.CreateProfile("Profile 2", "room-2", testConfig())
+	time.Sleep(10 * time.Millisecond)
+	p3, _ := mgr.CreateProfile("Profile 3", "room-3", testConfig())
+
+	// Load profiles in specific order (p2, p1, p3)
+	time.Sleep(10 * time.Millisecond)
+	mgr.LoadProfile(p2.ID)
+	time.Sleep(10 * time.Millisecond)
+	mgr.LoadProfile(p1.ID)
+	time.Sleep(10 * time.Millisecond)
+	mgr.LoadProfile(p3.ID)
+
+	// List profiles - should be sorted by lastUsedAt desc
+	profiles := mgr.ListProfiles()
+
+	if len(profiles) != 3 {
+		t.Fatalf("Expected 3 profiles, got %d", len(profiles))
+	}
+
+	// Most recently used should be first
+	if profiles[0].ID != p3.ID {
+		t.Errorf("First profile should be p3, got %s", profiles[0].ID)
+	}
+	if profiles[1].ID != p1.ID {
+		t.Errorf("Second profile should be p1, got %s", profiles[1].ID)
+	}
+	if profiles[2].ID != p2.ID {
+		t.Errorf("Third profile should be p2, got %s", profiles[2].ID)
+	}
+}
+
+func TestManager_ListProfiles_NullLastUsedAtLast(t *testing.T) {
+	tmpDir := t.TempDir()
+	mgr := NewManager(tmpDir)
+
+	// Create two profiles
+	p1, _ := mgr.CreateProfile("Profile 1", "room-1", testConfig())
+	p2, _ := mgr.CreateProfile("Profile 2", "room-2", testConfig())
+
+	// Load only p1
+	mgr.LoadProfile(p1.ID)
+
+	// List profiles
+	profiles := mgr.ListProfiles()
+
+	if len(profiles) != 2 {
+		t.Fatalf("Expected 2 profiles, got %d", len(profiles))
+	}
+
+	// p1 (with LastUsedAt) should be first
+	if profiles[0].ID != p1.ID {
+		t.Errorf("First profile should be p1 (with LastUsedAt), got %s", profiles[0].ID)
+	}
+
+	// p2 (without LastUsedAt) should be second
+	if profiles[1].ID != p2.ID {
+		t.Errorf("Second profile should be p2 (without LastUsedAt), got %s", profiles[1].ID)
+	}
+}

@@ -232,3 +232,56 @@ func (m *Manager) UpdateProfile(id string, config api.Config) (*Profile, error) 
 
 	return profile, nil
 }
+
+// DeleteProfile deletes a profile by ID
+func (m *Manager) DeleteProfile(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Check if profile exists
+	if _, exists := m.profiles[id]; !exists {
+		return fmt.Errorf("profile not found: %s", id)
+	}
+
+	// Remove from map
+	delete(m.profiles, id)
+
+	// Save to disk
+	if err := m.saveProfilesLocked(); err != nil {
+		return fmt.Errorf("save profiles: %w", err)
+	}
+
+	return nil
+}
+
+// ListProfiles returns all profiles sorted by lastUsedAt desc (most recent first)
+// Profiles with nil lastUsedAt are sorted to the end
+func (m *Manager) ListProfiles() []*Profile {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Convert map to slice
+	profiles := make([]*Profile, 0, len(m.profiles))
+	for _, p := range m.profiles {
+		profiles = append(profiles, p)
+	}
+
+	// Sort by lastUsedAt desc (most recent first)
+	// Profiles with nil lastUsedAt go to the end
+	for i := 0; i < len(profiles); i++ {
+		for j := i + 1; j < len(profiles); j++ {
+			// If i has nil lastUsedAt and j doesn't, swap
+			if profiles[i].LastUsedAt == nil && profiles[j].LastUsedAt != nil {
+				profiles[i], profiles[j] = profiles[j], profiles[i]
+			}
+			// If both have lastUsedAt, sort by time desc
+			if profiles[i].LastUsedAt != nil && profiles[j].LastUsedAt != nil {
+				if profiles[j].LastUsedAt.After(*profiles[i].LastUsedAt) {
+					profiles[i], profiles[j] = profiles[j], profiles[i]
+				}
+			}
+		}
+	}
+
+	return profiles
+}
