@@ -598,3 +598,82 @@ func (a *App) ListProfiles() []*profile.Profile {
 	}
 	return a.profileManager.ListProfiles()
 }
+
+// Authentication Wails Bindings
+
+// Login authenticates a user with username and password
+func (a *App) Login(username, password string) (*api.AuthResponse, error) {
+	// Create temporary client if not connected
+	client := a.apiClient
+	if client == nil {
+		client = api.NewClient(a.bbCoreURL, "")
+	}
+	
+	authResp, err := client.Login(username, password)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Update API client with new tokens
+	if a.apiClient != nil {
+		a.apiClient.SetTokens(authResp.AccessToken, authResp.RefreshToken)
+	}
+	
+	return authResp, nil
+}
+
+// Register creates a new user account
+func (a *App) Register(username, email, password, agencyName, firstName, lastName string) (*api.AuthResponse, error) {
+	// Create temporary client if not connected
+	client := a.apiClient
+	if client == nil {
+		client = api.NewClient(a.bbCoreURL, "")
+	}
+	
+	authResp, err := client.Register(username, email, password, agencyName, firstName, lastName)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Update API client with new tokens
+	if a.apiClient != nil {
+		a.apiClient.SetTokens(authResp.AccessToken, authResp.RefreshToken)
+	}
+	
+	return authResp, nil
+}
+
+// RefreshAuthToken refreshes the authentication token
+func (a *App) RefreshAuthToken(refreshToken string) (*api.AuthResponse, error) {
+	client := a.apiClient
+	if client == nil {
+		client = api.NewClient(a.bbCoreURL, "")
+	}
+	
+	authResp, err := client.RefreshToken(refreshToken)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Update API client with new tokens
+	if a.apiClient != nil {
+		a.apiClient.SetTokens(authResp.AccessToken, authResp.RefreshToken)
+	}
+	
+	return authResp, nil
+}
+
+// Config and Validation Wails Bindings
+
+// FetchConfig fetches room configuration from BB-Core (alias for GetBBAppConfig for consistency)
+func (a *App) FetchConfig(roomID string) (*api.Config, error) {
+	return a.GetBBAppConfig(roomID)
+}
+
+// ValidateTrial validates streamers for trial accounts
+func (a *App) ValidateTrial(streamers []api.ValidateTrialStreamer) (*api.ValidateTrialResponse, error) {
+	if a.apiClient == nil {
+		return nil, fmt.Errorf("not connected to BB-Core")
+	}
+	return a.apiClient.ValidateTrial(streamers)
+}
