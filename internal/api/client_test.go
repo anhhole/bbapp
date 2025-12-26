@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -1039,5 +1040,125 @@ func TestClient_ValidateTrial_Rejected(t *testing.T) {
 
 	if resp.Reason != "TRIAL_BIGO_ID_USED" {
 		t.Errorf("Expected reason TRIAL_BIGO_ID_USED, got %s", resp.Reason)
+	}
+}
+
+// SendHeartbeat Tests
+
+func TestClient_SendHeartbeat_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify new official endpoint
+		if r.URL.Path != "/api/v1/external/heartbeat" {
+			t.Errorf("Expected /api/v1/external/heartbeat, got %s", r.URL.Path)
+		}
+
+		if r.Method != "POST" {
+			t.Errorf("Expected POST, got %s", r.Method)
+		}
+
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("Expected Bearer token, got %s", r.Header.Get("Authorization"))
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("Expected application/json, got %s", r.Header.Get("Content-Type"))
+		}
+
+		// Verify request body structure
+		var reqBody api.HeartbeatRequest
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			t.Fatalf("Failed to decode request body: %v", err)
+		}
+
+		if len(reqBody.Connections) != 2 {
+			t.Errorf("Expected 2 connections, got %d", len(reqBody.Connections))
+		}
+
+		// Verify ConnectionStatus structure
+		if reqBody.Connections[0].BigoId != "123456789" {
+			t.Errorf("Expected BigoId 123456789, got %s", reqBody.Connections[0].BigoId)
+		}
+
+		if reqBody.Connections[0].Status != "CONNECTED" {
+			t.Errorf("Expected CONNECTED, got %s", reqBody.Connections[0].Status)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"success": true}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test-token")
+
+	status := api.HeartbeatRequest{
+		Connections: []api.ConnectionStatus{
+			{
+				BigoId:           "123456789",
+				BigoRoomId:       "7269255640400014299",
+				Status:           "CONNECTED",
+				LastMessageAt:    1234567890,
+				MessagesReceived: 42,
+			},
+			{
+				BigoId:           "987654321",
+				BigoRoomId:       "7478500464273093441",
+				Status:           "CONNECTED",
+				LastMessageAt:    1234567891,
+				MessagesReceived: 38,
+			},
+		},
+	}
+
+	err := client.SendHeartbeat(status)
+	if err != nil {
+		t.Fatalf("SendHeartbeat failed: %v", err)
+	}
+}
+
+func TestClient_SendHeartbeat_WithError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify request body includes error information
+		var reqBody api.HeartbeatRequest
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			t.Fatalf("Failed to decode request body: %v", err)
+		}
+
+		if len(reqBody.Connections) != 1 {
+			t.Errorf("Expected 1 connection, got %d", len(reqBody.Connections))
+		}
+
+		if reqBody.Connections[0].Status != "DISCONNECTED" {
+			t.Errorf("Expected DISCONNECTED, got %s", reqBody.Connections[0].Status)
+		}
+
+		if reqBody.Connections[0].Error != "WebSocket connection lost" {
+			t.Errorf("Expected error message, got %s", reqBody.Connections[0].Error)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"success": true}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test-token")
+
+	status := api.HeartbeatRequest{
+		Connections: []api.ConnectionStatus{
+			{
+				BigoId:           "123456789",
+				BigoRoomId:       "7269255640400014299",
+				Status:           "DISCONNECTED",
+				LastMessageAt:    1234567890,
+				MessagesReceived: 42,
+				Error:            "WebSocket connection lost",
+			},
+		},
+	}
+
+	err := client.SendHeartbeat(status)
+	if err != nil {
+		t.Fatalf("SendHeartbeat failed: %v", err)
 	}
 }

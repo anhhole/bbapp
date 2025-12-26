@@ -56,12 +56,12 @@ type HeartbeatRequest struct {
 }
 
 type ConnectionStatus struct {
+	BigoId           string `json:"bigoId"`
 	BigoRoomId       string `json:"bigoRoomId"`
-	StreamerId       string `json:"streamerId"`
-	Status           string `json:"status"` // CONNECTED, DISCONNECTED, ERROR
-	MessagesReceived int64  `json:"messagesReceived"`
-	LastMessageTime  int64  `json:"lastMessageTime"`
-	ErrorMessage     string `json:"errorMessage,omitempty"`
+	Status           string `json:"status"` // CONNECTED, DISCONNECTED
+	LastMessageAt    int64  `json:"lastMessageAt,omitempty"`
+	MessagesReceived int64  `json:"messagesReceived,omitempty"`
+	Error            string `json:"error,omitempty"`
 }
 
 // Authentication Types

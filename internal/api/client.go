@@ -168,14 +168,23 @@ func (c *Client) ValidateTrial(streamers []ValidateTrialStreamer) (*ValidateTria
 	return &resp, nil
 }
 
-func (c *Client) SendHeartbeat(roomId string, status HeartbeatRequest) error {
-	url := fmt.Sprintf("%s/bbapp-status/%s", c.baseURL, roomId)
+func (c *Client) SendHeartbeat(status HeartbeatRequest) error {
+	// Migrated to official BB-Core API endpoint
+	url := fmt.Sprintf("%s/api/v1/external/heartbeat", c.baseURL)
 
-	jsonData, _ := json.Marshal(status)
+	jsonData, err := json.Marshal(status)
+	if err != nil {
+		return fmt.Errorf("marshal request: %w", err)
+	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
+	}
+
+	// Enable request body recreation for retries
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(jsonData)), nil
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.authToken)
