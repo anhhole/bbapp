@@ -226,3 +226,54 @@ func TestManager_LoadProfile_UpdatesFile(t *testing.T) {
 		t.Error("LastUsedAt should be persisted to file")
 	}
 }
+
+func TestManager_UpdateProfile_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	mgr := NewManager(tmpDir)
+
+	// Create a profile
+	created, err := mgr.CreateProfile("Test Profile", "room-123", testConfig())
+	if err != nil {
+		t.Fatalf("CreateProfile() error = %v", err)
+	}
+
+	originalUpdatedAt := created.UpdatedAt
+
+	// Wait a bit to ensure timestamp difference
+	time.Sleep(10 * time.Millisecond)
+
+	// Update the profile config
+	newConfig := api.Config{
+		RoomId:   "room-456",
+		AgencyId: 999,
+	}
+
+	updated, err := mgr.UpdateProfile(created.ID, newConfig)
+	if err != nil {
+		t.Fatalf("UpdateProfile() error = %v", err)
+	}
+
+	// Verify config was updated
+	if updated.Config.RoomId != "room-456" {
+		t.Errorf("Config.RoomId = %s, want room-456", updated.Config.RoomId)
+	}
+	if updated.Config.AgencyId != 999 {
+		t.Errorf("Config.AgencyId = %d, want 999", updated.Config.AgencyId)
+	}
+
+	// Verify UpdatedAt timestamp changed
+	if !updated.UpdatedAt.After(originalUpdatedAt) {
+		t.Error("UpdatedAt should be after original timestamp")
+	}
+}
+
+func TestManager_UpdateProfile_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	mgr := NewManager(tmpDir)
+
+	// Try to update non-existent profile
+	_, err := mgr.UpdateProfile("non-existent-id", testConfig())
+	if err == nil {
+		t.Error("UpdateProfile() should return error for non-existent profile")
+	}
+}
