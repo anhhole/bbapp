@@ -209,6 +209,7 @@ func (a *App) AddStreamer(bigoRoomId, teamId, roomId string) error {
 				"diamonds":       gift.Diamonds,
 				"giftImageUrl":   gift.GiftImageUrl,
 				"timestamp":      gift.Timestamp,
+				"deviceHash":     a.deviceHash,
 			}
 
 			destination := "/app/room/" + roomId + "/bigo"
@@ -238,6 +239,7 @@ func (a *App) AddStreamer(bigoRoomId, teamId, roomId string) error {
 				"senderLevel":  chat.SenderLevel,
 				"message":      chat.Message,
 				"timestamp":    chat.Timestamp,
+				"deviceHash":   a.deviceHash,
 			}
 
 			destination := "/app/room/" + roomId + "/bigo"

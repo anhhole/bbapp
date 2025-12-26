@@ -87,17 +87,11 @@ func (m *Manager) Start(roomId string, cfg *api.Config, bbCoreURL, accessToken s
 
 	// Step 3: Establish STOMP connection
 	fmt.Println("[Session] Step 3: Establishing STOMP connection...")
-	stompClient, err := stomp.NewClient(bbCoreURL, accessToken)
+	stompClient, err := stomp.NewClient(bbCoreURL, accessToken, "")
 	if err != nil {
 		// Rollback: stop session at BB-Core
 		m.apiClient.StopSession(roomId, "STOMP_CONNECTION_FAILED")
 		return fmt.Errorf("STOMP connection failed: %w", err)
-	}
-
-	if err := stompClient.Connect(); err != nil {
-		// Rollback: stop session at BB-Core
-		m.apiClient.StopSession(roomId, "STOMP_CONNECTION_FAILED")
-		return fmt.Errorf("STOMP connect failed: %w", err)
 	}
 
 	m.stompClient = stompClient
@@ -105,7 +99,7 @@ func (m *Manager) Start(roomId string, cfg *api.Config, bbCoreURL, accessToken s
 
 	// Step 4: Start heartbeat service
 	fmt.Println("[Session] Step 4: Starting heartbeat service...")
-	m.heartbeat = NewHeartbeat(m.apiClient, m)
+	m.heartbeat = NewHeartbeat(m, m.apiClient, roomId, 30*time.Second)
 	m.heartbeat.Start()
 	fmt.Printf("[Session] ✓ Heartbeat service started (30s interval)\n")
 
@@ -175,12 +169,12 @@ func (m *Manager) UpdateConnectionStatus(bigoRoomId, status, errorMsg string, ms
 	}
 
 	conn := &api.ConnectionStatus{
+		BigoId:           streamer.BigoId,
 		BigoRoomId:       bigoRoomId,
-		StreamerId:       streamer.StreamerId,
 		Status:           status,
 		MessagesReceived: msgCount,
-		LastMessageTime:  time.Now().UnixMilli(),
-		ErrorMessage:     errorMsg,
+		LastMessageAt:    time.Now().UnixMilli(),
+		Error:            errorMsg,
 	}
 
 	m.connections[bigoRoomId] = conn

@@ -86,7 +86,7 @@ func (h *Heartbeat) sendStatus() {
 		Connections: status.Connections,
 	}
 
-	if err := h.apiClient.SendHeartbeat(h.roomId, req); err != nil {
+	if err := h.apiClient.SendHeartbeat(req); err != nil {
 		fmt.Printf("[Heartbeat] ERROR: Failed to send heartbeat: %v\n", err)
 	} else {
 		fmt.Printf("[Heartbeat] ✓ Sent (connections: %d)\n", len(status.Connections))
