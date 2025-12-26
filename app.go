@@ -299,59 +299,53 @@ func (a *App) GetConnections() []map[string]string {
 }
 
 // StartPKSession starts a complete PK session with BB-Core integration
-func (a *App) StartPKSession(bbCoreUrl, authToken, roomId string) error {
+// Takes roomId and config from the wizard (config already fetched and validated)
+func (a *App) StartPKSession(bbCoreUrl, authToken, roomId string, cfg api.Config) error {
 	fmt.Printf("[App] Starting PK session for room: %s\n", roomId)
 
-	// Generate device hash
-	deviceHash, err := fingerprint.GenerateDeviceHash()
-	if err != nil {
-		return fmt.Errorf("device fingerprint: %w", err)
+	// Generate device hash if not already set
+	if a.deviceHash == "" {
+		deviceHash, err := fingerprint.GenerateDeviceHash()
+		if err != nil {
+			return fmt.Errorf("device fingerprint: %w", err)
+		}
+		a.deviceHash = deviceHash
+		fmt.Printf("[App] Device hash: %s\n", deviceHash)
 	}
-	a.deviceHash = deviceHash
-	fmt.Printf("[App] Device hash: %s\n", deviceHash)
 
-	// Initialize API client
-	apiClient := api.NewClient(bbCoreUrl, authToken)
-	fmt.Printf("[App] API client initialized\n")
+	// Initialize API client if not already set
+	if a.apiClient == nil {
+		a.apiClient = api.NewClient(bbCoreUrl, authToken)
+		a.bbCoreURL = bbCoreUrl
+		fmt.Printf("[App] API client initialized\n")
+	}
 
 	// Initialize session manager
 	a.session = session.NewManager()
-	a.session.Initialize(apiClient, deviceHash)
+	a.session.Initialize(a.apiClient, a.deviceHash)
 	fmt.Printf("[App] Session manager initialized\n")
 
-	// Start session (fetches config, calls BB-Core API)
-	if err := a.session.Start(roomId); err != nil {
-		return fmt.Errorf("session start: %w", err)
-	}
-
-	// Connect to STOMP (extract from bbCoreUrl or use WebSocket endpoint)
-	// For now, assume STOMP is on same host with /ws path
-	stompUrl := bbCoreUrl + "/ws"
-	if err := a.ConnectToCore(stompUrl, authToken, ""); err != nil {
-		a.session.Stop("STOMP_FAILED")
-		return fmt.Errorf("STOMP connect: %w", err)
+	// Start session (validates trial, connects STOMP, starts heartbeat)
+	// Enhanced session manager now handles everything
+	if err := a.session.Start(roomId, &cfg, bbCoreUrl, authToken); err != nil {
+		return fmt.Errorf("session start failed: %w", err)
 	}
 
 	// Get all Bigo rooms from config
-	cfg := a.session.GetConfig()
-	bigoRooms := cfg.GetAllBigoRoomIds()
+	cfgMgr := a.session.GetConfig()
+	bigoRooms := cfgMgr.GetAllBigoRoomIds()
 	fmt.Printf("[App] Starting %d Bigo listeners from config\n", len(bigoRooms))
 
 	// Start browsers for all streamers
 	for _, bigoRoomId := range bigoRooms {
-		// Use addBigoListener helper (we'll create this)
 		if err := a.addBigoListenerForSession(bigoRoomId, roomId); err != nil {
 			fmt.Printf("[App] ERROR: Failed to start listener for %s: %v\n", bigoRoomId, err)
+			// Continue with other listeners even if one fails
 			continue
 		}
 	}
 
-	// Start heartbeat
-	a.heartbeat = session.NewHeartbeat(a.session, apiClient, roomId, 0)
-	a.heartbeat.Start()
-	fmt.Printf("[App] Heartbeat service started\n")
-
-	fmt.Printf("[App] ✓ PK session started successfully\n")
+	fmt.Printf("[App] ✓✓✓ PK session started successfully with %d active listeners\n", len(a.listeners))
 	return nil
 }
 
@@ -359,37 +353,28 @@ func (a *App) StartPKSession(bbCoreUrl, authToken, roomId string) error {
 func (a *App) StopPKSession(reason string) error {
 	fmt.Printf("[App] Stopping PK session: %s\n", reason)
 
-	// Stop heartbeat
-	if a.heartbeat != nil {
-		a.heartbeat.Stop()
-		a.heartbeat = nil
-		fmt.Printf("[App] Heartbeat stopped\n")
-	}
-
-	// Stop all browsers
+	// Stop all browser listeners
 	a.mutex.Lock()
-	for bigoRoomId := range a.listeners {
+	for bigoRoomId, listener := range a.listeners {
 		fmt.Printf("[App] Stopping listener for room: %s\n", bigoRoomId)
+		if listener != nil {
+			listener.Stop()
+		}
 	}
 	a.listeners = make(map[string]*listener.BigoListener)
 	a.mutex.Unlock()
+	fmt.Printf("[App] ✓ All browser listeners stopped\n")
 
-	// Stop session at BB-Core
+	// Stop session (handles heartbeat, STOMP, BB-Core notification)
 	if a.session != nil {
 		if err := a.session.Stop(reason); err != nil {
 			fmt.Printf("[App] WARNING: Session stop failed: %v\n", err)
+			// Continue cleanup even if session stop fails
 		}
 		a.session = nil
 	}
 
-	// Disconnect STOMP
-	if a.stompClient != nil {
-		a.stompClient.Disconnect()
-		a.stompClient = nil
-		fmt.Printf("[App] STOMP disconnected\n")
-	}
-
-	fmt.Printf("[App] ✓ PK session stopped\n")
+	fmt.Printf("[App] ✓✓✓ PK session stopped successfully\n")
 	return nil
 }
 
