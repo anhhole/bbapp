@@ -185,6 +185,56 @@ func (c *Client) Login(username, password string) (*AuthResponse, error) {
 	return &resp, nil
 }
 
+// Register creates a new user account with BB-Core
+func (c *Client) Register(username, email, password, agencyName, firstName, lastName string) (*AuthResponse, error) {
+	if strings.TrimSpace(username) == "" {
+		return nil, fmt.Errorf("username cannot be empty")
+	}
+	if strings.TrimSpace(email) == "" {
+		return nil, fmt.Errorf("email cannot be empty")
+	}
+	if strings.TrimSpace(password) == "" {
+		return nil, fmt.Errorf("password cannot be empty")
+	}
+	if strings.TrimSpace(agencyName) == "" {
+		return nil, fmt.Errorf("agencyName cannot be empty")
+	}
+
+	url := fmt.Sprintf("%s/api/v1/auth/register", c.baseURL)
+
+	reqBody := RegisterRequest{
+		Username:   username,
+		Email:      email,
+		Password:   password,
+		AgencyName: agencyName,
+		FirstName:  firstName,
+		LastName:   lastName,
+	}
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	// Enable request body recreation for retries
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(jsonData)), nil
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	var resp AuthResponse
+	if err := c.doRequest(req, &resp); err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
 // RefreshToken gets a new access token
 func (c *Client) RefreshToken(refreshToken string) (*AuthResponse, error) {
 	if strings.TrimSpace(refreshToken) == "" {
