@@ -118,3 +118,23 @@ type Agency struct {
 	CurrentRooms int       `json:"currentRooms"`
 	ExpiresAt    time.Time `json:"expiresAt"`
 }
+// ValidateTrial Types
+
+// ValidateTrialStreamer represents a streamer to validate
+type ValidateTrialStreamer struct {
+	BigoId     string `json:"bigoId"`
+	BigoRoomId string `json:"bigoRoomId"`
+}
+
+// ValidateTrialRequest is the request body for trial validation
+type ValidateTrialRequest struct {
+	Streamers []ValidateTrialStreamer `json:"streamers"`
+}
+
+// ValidateTrialResponse is the response from trial validation
+type ValidateTrialResponse struct {
+	Allowed        bool     `json:"allowed"`
+	Message        string   `json:"message"`
+	BlockedBigoIds []string `json:"blockedBigoIds"`
+	Reason         string   `json:"reason,omitempty"`
+}

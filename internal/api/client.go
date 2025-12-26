@@ -137,6 +137,37 @@ func (c *Client) StopSession(roomId, reason string) (*StopSessionResponse, error
 	return &resp, nil
 }
 
+// ValidateTrial validates if streamers can be used for trial accounts
+func (c *Client) ValidateTrial(streamers []ValidateTrialStreamer) (*ValidateTrialResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/external/validate-trial", c.baseURL)
+
+	reqBody := ValidateTrialRequest{Streamers: streamers}
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	// Enable request body recreation for retries
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(jsonData)), nil
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.authToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	var resp ValidateTrialResponse
+	if err := c.doRequest(req, &resp); err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
 func (c *Client) SendHeartbeat(roomId string, status HeartbeatRequest) error {
 	url := fmt.Sprintf("%s/bbapp-status/%s", c.baseURL, roomId)
 

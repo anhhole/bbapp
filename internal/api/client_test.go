@@ -948,3 +948,96 @@ func TestClient_RefreshToken_EmptyToken(t *testing.T) {
 		t.Error("Expected error for whitespace token, got nil")
 	}
 }
+
+// ValidateTrial Tests
+
+func TestClient_ValidateTrial_Allowed(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/external/validate-trial" {
+			t.Errorf("Expected /api/v1/external/validate-trial, got %s", r.URL.Path)
+		}
+
+		if r.Method != "POST" {
+			t.Errorf("Expected POST, got %s", r.Method)
+		}
+
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("Expected Bearer token, got %s", r.Header.Get("Authorization"))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{
+			"allowed": true,
+			"message": "All streamers validated",
+			"blockedBigoIds": [],
+			"reason": ""
+		}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test-token")
+	
+	streamers := []api.ValidateTrialStreamer{
+		{BigoId: "123456789", BigoRoomId: "7269255640400014299"},
+		{BigoId: "987654321", BigoRoomId: "7478500464273093441"},
+	}
+
+	resp, err := client.ValidateTrial(streamers)
+	if err != nil {
+		t.Fatalf("ValidateTrial failed: %v", err)
+	}
+
+	if !resp.Allowed {
+		t.Error("Expected allowed=true")
+	}
+
+	if resp.Message != "All streamers validated" {
+		t.Errorf("Expected success message, got %s", resp.Message)
+	}
+
+	if len(resp.BlockedBigoIds) != 0 {
+		t.Errorf("Expected empty blockedBigoIds, got %v", resp.BlockedBigoIds)
+	}
+}
+
+func TestClient_ValidateTrial_Rejected(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{
+			"allowed": false,
+			"message": "Bigo ID 829454322 has already been used in a trial",
+			"blockedBigoIds": ["829454322"],
+			"reason": "TRIAL_BIGO_ID_USED"
+		}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test-token")
+	
+	streamers := []api.ValidateTrialStreamer{
+		{BigoId: "829454322", BigoRoomId: "7478500464273093441"},
+	}
+
+	resp, err := client.ValidateTrial(streamers)
+	if err != nil {
+		t.Fatalf("ValidateTrial failed: %v", err)
+	}
+
+	if resp.Allowed {
+		t.Error("Expected allowed=false")
+	}
+
+	if len(resp.BlockedBigoIds) != 1 {
+		t.Errorf("Expected 1 blocked ID, got %d", len(resp.BlockedBigoIds))
+	}
+
+	if resp.BlockedBigoIds[0] != "829454322" {
+		t.Errorf("Expected blocked ID 829454322, got %s", resp.BlockedBigoIds[0])
+	}
+
+	if resp.Reason != "TRIAL_BIGO_ID_USED" {
+		t.Errorf("Expected reason TRIAL_BIGO_ID_USED, got %s", resp.Reason)
+	}
+}
