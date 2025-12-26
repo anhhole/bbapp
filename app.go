@@ -14,26 +14,29 @@ import (
 	"bbapp/internal/listener"
 	"bbapp/internal/logger"
 	"bbapp/internal/overlayserver"
+	"bbapp/internal/profile"
 	"bbapp/internal/session"
 	"bbapp/internal/stomp"
 
 	"github.com/joho/godotenv"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
 type App struct {
-	ctx           context.Context
-	browserMgr    *browser.Manager
-	stompClient   *stomp.Client
-	logger        *logger.Logger
-	listeners     map[string]*listener.BigoListener
-	session       *session.Manager
-	heartbeat     *session.Heartbeat
-	deviceHash    string
-	mutex         sync.RWMutex
-	overlayServer *overlayserver.Server
-	bbCoreURL     string
-	apiClient     *api.Client
+	ctx            context.Context
+	browserMgr     *browser.Manager
+	stompClient    *stomp.Client
+	logger         *logger.Logger
+	listeners      map[string]*listener.BigoListener
+	session        *session.Manager
+	heartbeat      *session.Heartbeat
+	deviceHash     string
+	mutex          sync.RWMutex
+	overlayServer  *overlayserver.Server
+	bbCoreURL      string
+	apiClient      *api.Client
+	profileManager *profile.Manager
 }
 
 // NewApp creates new App
@@ -86,6 +89,14 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.logger = logger
 	fmt.Println("[App] Activity logger initialized (logs will be written to ./logs)")
+
+	// Initialize profile manager
+	profileDir := "./data/profiles"
+	if err := os.MkdirAll(profileDir, 0755); err != nil {
+		fmt.Printf("[App] WARNING: Could not create profiles directory: %v\n", err)
+	}
+	a.profileManager = profile.NewManager(profileDir)
+	fmt.Println("[App] Profile manager initialized (data stored in ./data/profiles)")
 
 	// Create debug frames directory
 	if err := os.MkdirAll("./debug_frames", 0755); err != nil {
@@ -544,4 +555,46 @@ func (a *App) SaveBBAppConfig(roomId string, config api.Config) error {
 		return fmt.Errorf("not connected to BB-Core")
 	}
 	return a.apiClient.SaveConfig(roomId, &config)
+}
+
+// Profile Management Wails Bindings
+
+// CreateProfile creates a new profile with the given name, room ID, and config
+func (a *App) CreateProfile(name, roomID string, config api.Config) (*profile.Profile, error) {
+	if a.profileManager == nil {
+		return nil, fmt.Errorf("profile manager not initialized")
+	}
+	return a.profileManager.CreateProfile(name, roomID, config)
+}
+
+// LoadProfile loads a profile by ID and updates its lastUsedAt timestamp
+func (a *App) LoadProfile(id string) (*profile.Profile, error) {
+	if a.profileManager == nil {
+		return nil, fmt.Errorf("profile manager not initialized")
+	}
+	return a.profileManager.LoadProfile(id)
+}
+
+// UpdateProfile updates a profile's config
+func (a *App) UpdateProfile(id string, config api.Config) (*profile.Profile, error) {
+	if a.profileManager == nil {
+		return nil, fmt.Errorf("profile manager not initialized")
+	}
+	return a.profileManager.UpdateProfile(id, config)
+}
+
+// DeleteProfile deletes a profile by ID
+func (a *App) DeleteProfile(id string) error {
+	if a.profileManager == nil {
+		return fmt.Errorf("profile manager not initialized")
+	}
+	return a.profileManager.DeleteProfile(id)
+}
+
+// ListProfiles returns all profiles sorted by lastUsedAt desc
+func (a *App) ListProfiles() []*profile.Profile {
+	if a.profileManager == nil {
+		return []*profile.Profile{}
+	}
+	return a.profileManager.ListProfiles()
 }
