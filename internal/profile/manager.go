@@ -186,3 +186,26 @@ func (m *Manager) saveProfilesLocked() error {
 
 	return nil
 }
+
+// LoadProfile loads a profile by ID and updates its LastUsedAt timestamp
+func (m *Manager) LoadProfile(id string) (*Profile, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Find profile
+	profile, exists := m.profiles[id]
+	if !exists {
+		return nil, fmt.Errorf("profile not found: %s", id)
+	}
+
+	// Update LastUsedAt timestamp
+	now := time.Now()
+	profile.LastUsedAt = &now
+
+	// Save to disk
+	if err := m.saveProfilesLocked(); err != nil {
+		return nil, fmt.Errorf("save profiles: %w", err)
+	}
+
+	return profile, nil
+}
