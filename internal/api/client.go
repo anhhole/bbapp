@@ -170,6 +170,11 @@ func (c *Client) Login(username, password string) (*AuthResponse, error) {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
+	// Enable request body recreation for retries
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(jsonData)), nil
+	}
+
 	req.Header.Set("Content-Type", "application/json")
 
 	var resp AuthResponse
@@ -197,6 +202,11 @@ func (c *Client) RefreshToken(refreshToken string) (*AuthResponse, error) {
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	// Enable request body recreation for retries
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(jsonData)), nil
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -244,6 +254,14 @@ func (c *Client) doRequest(req *http.Request, result interface{}) error {
 				time.Sleep(baseDelay * time.Duration(1<<attempt))
 				continue
 			}
+
+			// Try to parse as APIError
+			var apiErr APIError
+			if err := json.Unmarshal(body, &apiErr); err == nil && apiErr.ErrorCode != 0 {
+				return &apiErr
+			}
+
+			// Fallback to generic error
 			return fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
 		}
 
