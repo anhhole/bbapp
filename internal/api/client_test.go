@@ -647,3 +647,298 @@ func TestClient_Register_EmptyRequiredFields(t *testing.T) {
 	// This test would fail without a mock server, so we skip the actual call
 	// The validation above confirms required fields are checked
 }
+
+// TestClient_RefreshToken_Success tests successful token refresh
+func TestClient_RefreshToken_Success(t *testing.T) {
+	// Mock BB-Core server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify endpoint
+		if r.URL.Path != "/api/v1/auth/refresh-token" {
+			t.Errorf("Expected /api/v1/auth/refresh-token, got %s", r.URL.Path)
+		}
+
+		// Verify method
+		if r.Method != "POST" {
+			t.Errorf("Expected POST, got %s", r.Method)
+		}
+
+		// Verify Content-Type
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("Expected Content-Type: application/json, got %s", r.Header.Get("Content-Type"))
+		}
+
+		// Verify no Authorization header (refresh is public endpoint)
+		if r.Header.Get("Authorization") != "" {
+			t.Errorf("Expected no Authorization header, got %s", r.Header.Get("Authorization"))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{
+			"accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.new_access...",
+			"refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.new_refresh...",
+			"tokenType": "Bearer",
+			"expiresIn": 86400000,
+			"expiresAt": "2025-12-27T12:00:00.000Z",
+			"user": {
+				"id": 123,
+				"username": "john_doe",
+				"email": "john@example.com",
+				"firstName": "John",
+				"lastName": "Doe",
+				"roleCode": "OWNER"
+			},
+			"agency": {
+				"id": 456,
+				"name": "Test Agency",
+				"plan": "TRIAL",
+				"status": "ACTIVE",
+				"maxRooms": 1,
+				"currentRooms": 0,
+				"expiresAt": "2025-12-31T23:59:59.000Z"
+			}
+		}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "")
+	resp, err := client.RefreshToken("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.old_refresh...")
+
+	if err != nil {
+		t.Fatalf("RefreshToken failed: %v", err)
+	}
+
+	if resp.AccessToken != "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.new_access..." {
+		t.Errorf("Unexpected access token: %s", resp.AccessToken)
+	}
+
+	if resp.RefreshToken != "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.new_refresh..." {
+		t.Errorf("Unexpected refresh token: %s", resp.RefreshToken)
+	}
+
+	if resp.User.Username != "john_doe" {
+		t.Errorf("Expected username 'john_doe', got %s", resp.User.Username)
+	}
+
+	if resp.Agency.Name != "Test Agency" {
+		t.Errorf("Expected agency 'Test Agency', got %s", resp.Agency.Name)
+	}
+}
+
+// TestClient_RefreshToken_InvalidToken tests refresh with invalid token
+func TestClient_RefreshToken_InvalidToken(t *testing.T) {
+	// Mock BB-Core server returning error 2002
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{
+			"timestamp": "2025-12-26T12:00:00.000+0000",
+			"status": "UNAUTHORIZED",
+			"errorCode": 2002,
+			"message": "Invalid credentials",
+			"details": "Invalid refresh token signature"
+		}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "")
+	resp, err := client.RefreshToken("invalid.token.signature")
+
+	if err == nil {
+		t.Fatal("Expected error, got nil")
+	}
+
+	if resp != nil {
+		t.Fatalf("Expected nil response, got %+v", resp)
+	}
+
+	// Check if error is APIError with code 2002
+	apiErr, ok := err.(*api.APIError)
+	if !ok {
+		t.Fatalf("Expected APIError, got %T: %v", err, err)
+	}
+
+	if apiErr.ErrorCode != 2002 {
+		t.Errorf("Expected error code 2002, got %d", apiErr.ErrorCode)
+	}
+
+	if apiErr.Message != "Invalid credentials" {
+		t.Errorf("Expected message 'Invalid credentials', got %s", apiErr.Message)
+	}
+
+	if apiErr.Status != "UNAUTHORIZED" {
+		t.Errorf("Expected status 'UNAUTHORIZED', got %s", apiErr.Status)
+	}
+}
+
+// TestClient_RefreshToken_TokenExpired tests refresh with expired token
+func TestClient_RefreshToken_TokenExpired(t *testing.T) {
+	// Mock BB-Core server returning error 2003
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{
+			"timestamp": "2025-12-26T12:00:00.000+0000",
+			"status": "UNAUTHORIZED",
+			"errorCode": 2003,
+			"message": "Token expired",
+			"details": "Refresh token has expired"
+		}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "")
+	resp, err := client.RefreshToken("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.expired...")
+
+	if err == nil {
+		t.Fatal("Expected error, got nil")
+	}
+
+	if resp != nil {
+		t.Fatalf("Expected nil response, got %+v", resp)
+	}
+
+	// Check if error is APIError with code 2003
+	apiErr, ok := err.(*api.APIError)
+	if !ok {
+		t.Fatalf("Expected APIError, got %T: %v", err, err)
+	}
+
+	if apiErr.ErrorCode != 2003 {
+		t.Errorf("Expected error code 2003, got %d", apiErr.ErrorCode)
+	}
+
+	if apiErr.Message != "Token expired" {
+		t.Errorf("Expected message 'Token expired', got %s", apiErr.Message)
+	}
+
+	if apiErr.Status != "UNAUTHORIZED" {
+		t.Errorf("Expected status 'UNAUTHORIZED', got %s", apiErr.Status)
+	}
+}
+
+// TestClient_RefreshToken_ValidationError tests refresh with validation error
+func TestClient_RefreshToken_ValidationError(t *testing.T) {
+	// Mock BB-Core server returning validation error
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{
+			"timestamp": "2025-12-26T12:00:00.000+0000",
+			"status": "BAD_REQUEST",
+			"errorCode": 1003,
+			"message": "Validation failed",
+			"details": "Invalid refresh token format",
+			"subErrors": [
+				{
+					"object": "RefreshTokenRequest",
+					"field": "refreshToken",
+					"rejectedValue": "malformed",
+					"message": "Refresh token must be a valid JWT"
+				}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "")
+	resp, err := client.RefreshToken("malformed")
+
+	if err == nil {
+		t.Fatal("Expected error, got nil")
+	}
+
+	if resp != nil {
+		t.Fatalf("Expected nil response, got %+v", resp)
+	}
+
+	// Check if error is APIError with code 1003
+	apiErr, ok := err.(*api.APIError)
+	if !ok {
+		t.Fatalf("Expected APIError, got %T: %v", err, err)
+	}
+
+	if apiErr.ErrorCode != 1003 {
+		t.Errorf("Expected error code 1003, got %d", apiErr.ErrorCode)
+	}
+
+	if apiErr.Message != "Validation failed" {
+		t.Errorf("Expected message 'Validation failed', got %s", apiErr.Message)
+	}
+
+	// Check subErrors
+	if len(apiErr.SubErrors) != 1 {
+		t.Errorf("Expected 1 subError, got %d", len(apiErr.SubErrors))
+	} else {
+		subErr := apiErr.SubErrors[0]
+		if subErr.Field != "refreshToken" {
+			t.Errorf("Expected field 'refreshToken', got %s", subErr.Field)
+		}
+		if subErr.Message != "Refresh token must be a valid JWT" {
+			t.Errorf("Unexpected validation message: %s", subErr.Message)
+		}
+	}
+}
+
+// TestClient_RefreshToken_ServerError tests 5xx error with retry logic
+func TestClient_RefreshToken_ServerError(t *testing.T) {
+	attemptCount := 0
+
+	// Mock server that fails 3 times with 500
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptCount++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{
+			"timestamp": "2025-12-26T12:00:00.000+0000",
+			"status": "INTERNAL_SERVER_ERROR",
+			"errorCode": 5000,
+			"message": "Server error",
+			"details": "Database connection failed"
+		}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "")
+	resp, err := client.RefreshToken("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.refresh...")
+
+	if err == nil {
+		t.Fatal("Expected error, got nil")
+	}
+
+	if resp != nil {
+		t.Fatalf("Expected nil response, got %+v", resp)
+	}
+
+	// Verify retry logic was triggered (should have tried 3 times)
+	if attemptCount != 3 {
+		t.Errorf("Expected 3 attempts, got %d", attemptCount)
+	}
+
+	// Check if error is APIError with code 5000
+	apiErr, ok := err.(*api.APIError)
+	if !ok {
+		t.Fatalf("Expected APIError, got %T: %v", err, err)
+	}
+
+	if apiErr.ErrorCode != 5000 {
+		t.Errorf("Expected error code 5000, got %d", apiErr.ErrorCode)
+	}
+}
+
+// TestClient_RefreshToken_EmptyToken tests validation of empty token
+func TestClient_RefreshToken_EmptyToken(t *testing.T) {
+	client := api.NewClient("http://localhost:8080", "")
+
+	// Test empty token
+	_, err := client.RefreshToken("")
+	if err == nil {
+		t.Error("Expected error for empty token, got nil")
+	}
+
+	// Test whitespace token
+	_, err = client.RefreshToken("   ")
+	if err == nil {
+		t.Error("Expected error for whitespace token, got nil")
+	}
+}
