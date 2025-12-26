@@ -55,6 +55,11 @@ go test ./internal/api -v
 go test ./internal/session -v
 go test ./internal/fingerprint -v
 go test ./internal/config -v
+go test ./internal/profile -v
+go test ./internal/message -v
+
+# Run integration tests (requires mock BB-Core)
+go test ./internal/session -v
 ```
 
 ## Architecture (Post-Advanced Integration)
@@ -73,9 +78,27 @@ go test ./internal/config -v
 
 **internal/api/client.go**
 - BB-Core REST API client with retry logic (exponential backoff)
-- Methods: GetConfig, StartSession, StopSession, SendHeartbeat
+- Authentication: Login, Register, RefreshToken (JWT tokens)
+- Configuration: GetConfig, SaveConfig
+- Session: StartSession, StopSession, SendHeartbeat
+- Trial: ValidateTrial (anti-abuse checking)
 - 10s timeout, 3 retries with 1s, 2s, 4s delays
+- Auto token refresh on 401 responses
 - Bearer token authentication
+
+**internal/profile/manager.go**
+- Local profile management with JSON file storage
+- CRUD operations: CreateProfile, LoadProfile, UpdateProfile, DeleteProfile
+- UUID-based profile IDs
+- Atomic file writes (temp → rename pattern)
+- LastUsedAt tracking for MRU sorting
+- Thread-safe with RWMutex
+
+**internal/message/types.go**
+- Standardized message types for STOMP
+- GiftMessage: All 17 fields per BB-Core spec
+- ChatMessage: All 10 fields per BB-Core spec
+- Comprehensive serialization tests (6 test cases)
 
 **internal/fingerprint/device.go**
 - Generates deterministic device hash for trial validation
@@ -88,11 +111,16 @@ go test ./internal/config -v
 - GetAllBigoRoomIds() returns all configured rooms
 
 **internal/session/manager.go**
-- Session lifecycle orchestration
-- Start(roomId) - Fetches config, calls BB-Core start-session API
-- Stop(reason) - Gracefully stops session
-- UpdateConnectionStatus() - Tracks per-streamer health
+- Session lifecycle orchestration with 4-step flow:
+  1. Validate trial (final check before session start)
+  2. Start session at BB-Core (POST /pk/start-from-bbapp)
+  3. Establish STOMP connection (moved from app startup)
+  4. Start heartbeat service (30s interval)
+- Stop(reason) - Graceful cleanup: heartbeat → STOMP → BB-Core notification
+- UpdateConnectionStatus() - Tracks per-streamer connection health
+- GetStatus() - Returns session state and connection list
 - Thread-safe with RWMutex
+- Rollback on STOMP failure (stops session at BB-Core)
 
 **internal/session/heartbeat.go**
 - 30s interval heartbeat to BB-Core
@@ -114,12 +142,59 @@ go test ./internal/config -v
 - Supports both TCP and WebSocket transport
 
 **app.go (Wails App)**
+- Authentication bindings:
+  - `Login(username, password)` - JWT authentication
+  - `Register(...)` - User registration
+  - `RefreshAuthToken(refreshToken)` - Token refresh
+- Profile management bindings:
+  - `CreateProfile(name, roomID, config)` - Create new profile
+  - `LoadProfile(id)` - Load profile by ID
+  - `UpdateProfile(id, config)` - Update profile config
+  - `DeleteProfile(id)` - Delete profile
+  - `ListProfiles()` - Get all profiles (sorted by lastUsedAt)
+- API bindings:
+  - `FetchConfig(roomID)` - Get BB-Core config
+  - `ValidateTrial(streamers)` - Validate trial eligibility
 - Session-based workflow methods:
-  - `StartPKSession(bbCoreUrl, authToken, roomId)` - Complete session init
+  - `StartPKSession(bbCoreUrl, authToken, roomId, config)` - Complete session init
   - `StopPKSession(reason)` - Graceful session teardown
   - `GetSessionStatus()` - Returns current session state
 - Legacy methods (backward compatible):
   - `ConnectToCore()`, `AddStreamer()`, `RemoveStreamer()`
+
+### Frontend Components (Wizard UI)
+
+**frontend/src/components/wizard/WizardContainer.tsx**
+- Main wizard orchestration component
+- 4-step state machine with progress tracking
+- Step validation before navigation
+- Toast notification management
+
+**frontend/src/components/wizard/ProfileSelectionStep.tsx**
+- Load existing profiles or create new
+- Profile list with last used sorting
+- Form validation for new profiles
+
+**frontend/src/components/wizard/RoomConfigStep.tsx**
+- Room ID input with BB-Core config fetch
+- Configuration preview display
+- Error handling with persistent toasts
+
+**frontend/src/components/wizard/StreamerConfigStep.tsx**
+- Streamer table display grouped by teams
+- Live trial validation with ValidateTrial API
+- Blocks progression if validation fails
+- Shows blocked Bigo IDs with reason
+
+**frontend/src/components/wizard/ReviewStep.tsx**
+- Configuration summary (teams, streamers, counts)
+- Save profile and/or start session options
+- Calls StartPKSession with complete config
+
+**frontend/src/components/wizard/ToastNotification.tsx**
+- Auto-dismiss notifications (5s default)
+- Persistent toast support for critical errors
+- Manual dismiss capability
 
 ### Data Flow
 
@@ -211,18 +286,46 @@ When implementing new features:
 5. Build with `wails build` to ensure frontend bindings generate
 6. Test in dev mode with `wails dev`
 
-## Recent Enhancements
+## Recent Enhancements (BB-Core Official API Integration)
 
-- ✅ REST API client for BB-Core
-- ✅ Device fingerprinting
-- ✅ Configuration manager
-- ✅ Enhanced BigoGift struct (all fields)
-- ✅ Chat message support
-- ✅ Session manager
-- ✅ Heartbeat service (30s)
-- ✅ STOMP auto-reconnection
-- ✅ Session-based UI workflow
-- ✅ Connection health dashboard
+**Phase 1: Authentication Foundation**
+- ✅ JWT authentication (Login, Register, RefreshToken)
+- ✅ Auto token refresh on 401 responses
+- ✅ 36 comprehensive API tests (100% passing)
+
+**Phase 2: API Client Refactor**
+- ✅ Migrated to official BB-Core endpoints (/api/v1/external/*)
+- ✅ GetConfig, SaveConfig, ValidateTrial endpoints
+- ✅ Enhanced error handling (APIError, ValidationError types)
+- ✅ Retry logic with exponential backoff
+
+**Phase 3: Profile Management**
+- ✅ Local profile storage (JSON files with atomic writes)
+- ✅ CRUD operations with UUID-based IDs
+- ✅ 19 profile manager tests (100% passing)
+
+**Phase 4: Wizard UI**
+- ✅ 4-step configuration wizard (Profile → Config → Streamers → Review)
+- ✅ React components with real-time validation
+- ✅ Toast notification system
+- ✅ Wails bindings for all backend functionality
+
+**Phase 5: Session Manager Enhancement**
+- ✅ 4-step session start (trial validation → start → STOMP → heartbeat)
+- ✅ STOMP lifecycle tied to session (not app startup)
+- ✅ Graceful cleanup with rollback on failures
+- ✅ DeviceHash in all STOMP messages
+
+**Phase 6: Message Format Alignment**
+- ✅ Standardized GiftMessage and ChatMessage types
+- ✅ 6 serialization tests (100% passing)
+- ✅ Full BB-Core spec compliance
+
+**Phase 7: Integration Testing**
+- ✅ Mock BB-Core server framework
+- ✅ 9 comprehensive integration test suites
+- ✅ 19 integration test scenarios (100% passing)
+- ✅ Session lifecycle, error recovery, multi-streamer testing
 
 ## Known Features
 
