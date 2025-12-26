@@ -1,0 +1,131 @@
+.wizard-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.wizard-header {
+  margin-bottom: 40px;
+}
+
+.wizard-header h2 {
+  margin: 0 0 30px 0;
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.wizard-progress {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  margin: 0 auto;
+  max-width: 600px;
+}
+
+.wizard-progress::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #e5e7eb;
+  z-index: 0;
+}
+
+.progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+  flex: 1;
+}
+
+.progress-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.progress-step.active .progress-circle {
+  background: #3b82f6;
+  color: white;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+.progress-step.completed .progress-circle {
+  background: #10b981;
+  color: white;
+}
+
+.progress-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  text-align: center;
+}
+
+.progress-step.active .progress-label {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.wizard-content {
+  min-height: 400px;
+  padding: 30px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.wizard-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wizard-btn {
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.wizard-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wizard-btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.wizard-btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.wizard-btn-secondary {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.wizard-btn-secondary:hover:not(:disabled) {
+  background: #d1d5db;
+}
