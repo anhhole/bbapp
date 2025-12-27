@@ -1,15 +1,58 @@
 export namespace api {
 	
-	export class UserInfo {
+	export class Agency {
+	    id: number;
+	    name: string;
+	    plan: string;
+	    status: string;
+	    maxRooms: number;
+	    currentRooms: number;
+	    // Go type: time
+	    expiresAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new Agency(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.plan = source["plan"];
+	        this.status = source["status"];
+	        this.maxRooms = source["maxRooms"];
+	        this.currentRooms = source["currentRooms"];
+	        this.expiresAt = this.convertValues(source["expiresAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class User {
 	    id: number;
 	    username: string;
 	    email: string;
-	    firstName: string;
-	    lastName: string;
+	    firstName?: string;
+	    lastName?: string;
 	    roleCode: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new UserInfo(source);
+	        return new User(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -27,8 +70,10 @@ export namespace api {
 	    refreshToken: string;
 	    tokenType: string;
 	    expiresIn: number;
-	    expiresAt: string;
-	    user: UserInfo;
+	    // Go type: time
+	    expiresAt: any;
+	    user: User;
+	    agency: Agency;
 	
 	    static createFrom(source: any = {}) {
 	        return new AuthResponse(source);
@@ -40,8 +85,9 @@ export namespace api {
 	        this.refreshToken = source["refreshToken"];
 	        this.tokenType = source["tokenType"];
 	        this.expiresIn = source["expiresIn"];
-	        this.expiresAt = source["expiresAt"];
-	        this.user = this.convertValues(source["user"], UserInfo);
+	        this.expiresAt = this.convertValues(source["expiresAt"], null);
+	        this.user = this.convertValues(source["user"], User);
+	        this.agency = this.convertValues(source["agency"], Agency);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -175,12 +221,12 @@ export namespace api {
 		}
 	}
 	export class ConnectionStatus {
+	    bigoId: string;
 	    bigoRoomId: string;
-	    streamerId: string;
 	    status: string;
-	    messagesReceived: number;
-	    lastMessageTime: number;
-	    errorMessage?: string;
+	    lastMessageAt?: number;
+	    messagesReceived?: number;
+	    error?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ConnectionStatus(source);
@@ -188,17 +234,100 @@ export namespace api {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bigoId = source["bigoId"];
 	        this.bigoRoomId = source["bigoRoomId"];
-	        this.streamerId = source["streamerId"];
 	        this.status = source["status"];
+	        this.lastMessageAt = source["lastMessageAt"];
 	        this.messagesReceived = source["messagesReceived"];
-	        this.lastMessageTime = source["lastMessageTime"];
-	        this.errorMessage = source["errorMessage"];
+	        this.error = source["error"];
 	    }
 	}
 	
 	
 	
+	
+	export class ValidateTrialResponse {
+	    allowed: boolean;
+	    message: string;
+	    blockedBigoIds: string[];
+	    reason?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ValidateTrialResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.allowed = source["allowed"];
+	        this.message = source["message"];
+	        this.blockedBigoIds = source["blockedBigoIds"];
+	        this.reason = source["reason"];
+	    }
+	}
+	export class ValidateTrialStreamer {
+	    bigoId: string;
+	    bigoRoomId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ValidateTrialStreamer(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bigoId = source["bigoId"];
+	        this.bigoRoomId = source["bigoRoomId"];
+	    }
+	}
+
+}
+
+export namespace profile {
+	
+	export class Profile {
+	    id: string;
+	    name: string;
+	    roomId: string;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    updatedAt: any;
+	    // Go type: time
+	    lastUsedAt?: any;
+	    config: api.Config;
+	
+	    static createFrom(source: any = {}) {
+	        return new Profile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.roomId = source["roomId"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	        this.lastUsedAt = this.convertValues(source["lastUsedAt"], null);
+	        this.config = this.convertValues(source["config"], api.Config);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 
 }
 

@@ -10,6 +10,18 @@ export function ConnectToCore(arg1, arg2, arg3) {
   return window['go']['main']['App']['ConnectToCore'](arg1, arg2, arg3);
 }
 
+export function CreateProfile(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateProfile'](arg1, arg2, arg3);
+}
+
+export function DeleteProfile(arg1) {
+  return window['go']['main']['App']['DeleteProfile'](arg1);
+}
+
+export function FetchConfig(arg1) {
+  return window['go']['main']['App']['FetchConfig'](arg1);
+}
+
 export function GetBBAppConfig(arg1) {
   return window['go']['main']['App']['GetBBAppConfig'](arg1);
 }
@@ -34,12 +46,24 @@ export function InitializeBBCoreClient(arg1, arg2) {
   return window['go']['main']['App']['InitializeBBCoreClient'](arg1, arg2);
 }
 
+export function ListProfiles() {
+  return window['go']['main']['App']['ListProfiles']();
+}
+
+export function LoadProfile(arg1) {
+  return window['go']['main']['App']['LoadProfile'](arg1);
+}
+
 export function Login(arg1, arg2) {
   return window['go']['main']['App']['Login'](arg1, arg2);
 }
 
-export function RefreshToken(arg1) {
-  return window['go']['main']['App']['RefreshToken'](arg1);
+export function RefreshAuthToken(arg1) {
+  return window['go']['main']['App']['RefreshAuthToken'](arg1);
+}
+
+export function Register(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['Register'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function RemoveStreamer(arg1) {
@@ -50,10 +74,18 @@ export function SaveBBAppConfig(arg1, arg2) {
   return window['go']['main']['App']['SaveBBAppConfig'](arg1, arg2);
 }
 
-export function StartPKSession(arg1, arg2, arg3) {
-  return window['go']['main']['App']['StartPKSession'](arg1, arg2, arg3);
+export function StartPKSession(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['StartPKSession'](arg1, arg2, arg3, arg4);
 }
 
 export function StopPKSession(arg1) {
   return window['go']['main']['App']['StopPKSession'](arg1);
+}
+
+export function UpdateProfile(arg1, arg2) {
+  return window['go']['main']['App']['UpdateProfile'](arg1, arg2);
+}
+
+export function ValidateTrial(arg1) {
+  return window['go']['main']['App']['ValidateTrial'](arg1);
 }

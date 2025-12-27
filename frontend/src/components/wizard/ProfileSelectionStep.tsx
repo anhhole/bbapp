@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { ListProfiles } from '../../../wailsjs/go/main/App';
-import type { WizardState } from './types';
+import type { WizardState, ToastType } from './types';
 
 interface ProfileSelectionStepProps {
   state: WizardState;
   updateState: (updates: Partial<WizardState>) => void;
-  addToast: (type: string, message: string, persistent?: boolean) => void;
+  addToast: (type: ToastType, message: string, persistent?: boolean) => void;
 }
 
 export function ProfileSelectionStep({

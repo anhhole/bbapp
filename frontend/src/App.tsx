@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { LoginPage } from './components/LoginPage';
 import { SceneTabs } from './components/SceneTabs';
 import { PKModeScene } from './scenes/pk-mode/ui/PKModeScene';
-import { RefreshToken } from '../wailsjs/go/main/App';
+import { RefreshAuthToken } from '../wailsjs/go/main/App';
 import type { User } from './shared/types';
 import './App.css';
 
@@ -21,7 +21,7 @@ function App() {
     // Refresh token every 50 minutes (assuming 60 min expiry)
     const interval = setInterval(async () => {
       try {
-        const response = await RefreshToken(refreshToken);
+        const response = await RefreshAuthToken(refreshToken);
         setAccessToken(response.accessToken);
         setRefreshToken(response.refreshToken);
         console.log('Token refreshed successfully');

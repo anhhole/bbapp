@@ -157,7 +157,27 @@ export const PKModeScene: React.FC<PKModeSceneProps> = ({
     setStartingSession(true);
     try {
       const bbCoreUrl = await GetBBCoreURL();
-      await StartPKSession(bbCoreUrl, accessToken, config.roomId);
+      // Convert local PKConfig to api.Config format expected by backend
+      // Note: Frontend uses custom PKConfig with Team[], backend expects api.Config
+      const apiConfig = new api.Config({
+        roomId: config.roomId,
+        agencyId: config.agencyId || 0,
+        session: new api.SessionInfo({
+          sessionId: '',
+          status: 'pending',
+          startedAt: 0,
+          endsAt: 0,
+          roomId: config.roomId,
+        }),
+        teams: config.teams.map(team => new api.Team({
+          teamId: team.teamId,
+          name: team.name,
+          bindingGift: team.bindingGift,
+          scoreMultipliers: team.scoreMultipliers || {},
+          streamers: [], // Streamers will be populated from config fetched by backend
+        })),
+      });
+      await StartPKSession(bbCoreUrl, accessToken, config.roomId, apiConfig);
 
       setSessionActive(true);
       onSessionChange(true);

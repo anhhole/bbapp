@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { CreateProfile, UpdateProfile } from '../../../wailsjs/go/main/App';
-import type { WizardState } from './types';
+import type { WizardState, ToastType } from './types';
 
 interface ReviewStepProps {
   state: WizardState;
   updateState: (updates: Partial<WizardState>) => void;
-  addToast: (type: string, message: string, persistent?: boolean) => void;
+  addToast: (type: ToastType, message: string, persistent?: boolean) => void;
   accessToken: string;
   onSessionStart: () => void;
 }

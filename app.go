@@ -19,7 +19,6 @@ import (
 	"bbapp/internal/stomp"
 
 	"github.com/joho/godotenv"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -29,6 +28,7 @@ type App struct {
 	stompClient    *stomp.Client
 	logger         *logger.Logger
 	listeners      map[string]*listener.BigoListener
+	cancels        map[string]context.CancelFunc
 	session        *session.Manager
 	heartbeat      *session.Heartbeat
 	deviceHash     string
@@ -43,6 +43,7 @@ type App struct {
 func NewApp() *App {
 	return &App{
 		listeners: make(map[string]*listener.BigoListener),
+		cancels:   make(map[string]context.CancelFunc),
 	}
 }
 
@@ -166,6 +167,9 @@ func (a *App) AddStreamer(bigoRoomId, teamId, roomId string) error {
 	}
 	fmt.Printf("[App] ✓ Browser created successfully\n")
 
+	// Store cancel function for cleanup
+	a.cancels[bigoRoomId] = cancel
+
 	// Create listener
 	bigoListener := listener.NewBigoListener(bigoRoomId, ctx)
 	fmt.Printf("[App] BigoListener created for room: %s\n", bigoRoomId)
@@ -278,8 +282,13 @@ func (a *App) RemoveStreamer(bigoRoomId string) error {
 		return fmt.Errorf("not monitoring room %s", bigoRoomId)
 	}
 
+	// Cancel browser context to clean up
+	if cancel, exists := a.cancels[bigoRoomId]; exists && cancel != nil {
+		cancel()
+		delete(a.cancels, bigoRoomId)
+	}
+
 	delete(a.listeners, bigoRoomId)
-	// Browser cleanup handled by context cancel
 	
 	fmt.Printf("[App] ✓ Stopped monitoring room: %s\n", bigoRoomId)
 	return nil
@@ -357,15 +366,16 @@ func (a *App) StopPKSession(reason string) error {
 
 	// Stop all browser listeners
 	a.mutex.Lock()
-	for bigoRoomId, listener := range a.listeners {
-		fmt.Printf("[App] Stopping listener for room: %s\n", bigoRoomId)
-		if listener != nil {
-			listener.Stop()
+	for bigoRoomId, cancel := range a.cancels {
+		fmt.Printf("[App] Stopping browser for room: %s\n", bigoRoomId)
+		if cancel != nil {
+			cancel()
 		}
 	}
 	a.listeners = make(map[string]*listener.BigoListener)
+	a.cancels = make(map[string]context.CancelFunc)
 	a.mutex.Unlock()
-	fmt.Printf("[App] ✓ All browser listeners stopped\n")
+	fmt.Printf("[App] ✓ All browsers stopped\n")
 
 	// Stop session (handles heartbeat, STOMP, BB-Core notification)
 	if a.session != nil {
@@ -394,10 +404,13 @@ func (a *App) addBigoListenerForSession(bigoRoomId, roomId string) error {
 	defer a.mutex.Unlock()
 
 	// Create browser
-	ctx, _, err := a.browserMgr.CreateBrowser(bigoRoomId)
+	ctx, cancel, err := a.browserMgr.CreateBrowser(bigoRoomId)
 	if err != nil {
 		return err
 	}
+
+	// Store cancel function for cleanup
+	a.cancels[bigoRoomId] = cancel
 
 	// Create listener
 	bigoListener := listener.NewBigoListener(bigoRoomId, ctx)
@@ -467,22 +480,6 @@ func (a *App) addBigoListenerForSession(bigoRoomId, roomId string) error {
 
 	a.listeners[bigoRoomId] = bigoListener
 	return nil
-}
-
-// Login authenticates the user with BB-Core using username and password.
-// Returns an AuthResponse containing access token, refresh token, and user info.
-// Returns an error if credentials are invalid or the server is unreachable.
-func (a *App) Login(username, password string) (*api.AuthResponse, error) {
-	client := api.NewClient(a.bbCoreURL, "")
-	return client.Login(username, password)
-}
-
-// RefreshToken obtains a new access token using the provided refresh token.
-// Returns an AuthResponse with the new tokens.
-// Returns an error if the refresh token is invalid or expired.
-func (a *App) RefreshToken(refreshToken string) (*api.AuthResponse, error) {
-	client := api.NewClient(a.bbCoreURL, "")
-	return client.RefreshToken(refreshToken)
 }
 
 // GetOverlayURL generates the overlay URL for OBS Browser Source.
