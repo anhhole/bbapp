@@ -1,0 +1,293 @@
+[
+  {
+    "id": "0b11c682-1f51-4c82-aea6-41af65251b6b",
+    "name": "Sohpie",
+    "roomId": "1089295543",
+    "createdAt": "2025-12-27T15:12:06.8657329+07:00",
+    "updatedAt": "2025-12-27T15:12:06.8657329+07:00",
+    "lastUsedAt": "2025-12-27T15:15:48.3746442+07:00",
+    "bigoAvatar": "",
+    "bigoNickName": "",
+    "config": {
+      "roomId": "1089295543",
+      "agencyId": 0,
+      "session": {
+        "sessionId": "",
+        "startTime": 0,
+        "status": ""
+      },
+      "teams": [
+        {
+          "teamId": "team-1",
+          "name": "Team A",
+          "avatar": "",
+          "bindingGift": "Rose",
+          "scoreMultipliers": {},
+          "streamers": [
+            {
+              "id": "",
+              "bigoId": "",
+              "bigoRoomId": "1",
+              "name": "Streamer 1",
+              "avatar": "",
+              "bindingGift": "Rose"
+            }
+          ]
+        },
+        {
+          "teamId": "team-2",
+          "name": "Team B",
+          "avatar": "",
+          "bindingGift": "Diamond",
+          "scoreMultipliers": {},
+          "streamers": [
+            {
+              "id": "",
+              "bigoId": "",
+              "bigoRoomId": "2",
+              "name": "Streamer 2",
+              "avatar": "",
+              "bindingGift": "Diamond"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "453f2f66-0b7f-497d-940b-1a69841e3287",
+    "name": "Sophie",
+    "roomId": "1089295543",
+    "createdAt": "2025-12-27T15:04:21.2489002+07:00",
+    "updatedAt": "2026-01-10T14:06:01.9850508+07:00",
+    "lastUsedAt": "2025-12-27T15:59:53.9711735+07:00",
+    "bigoAvatar": "",
+    "bigoNickName": "",
+    "config": {
+      "roomId": "1089295543",
+      "agencyId": 0,
+      "session": {
+        "sessionId": "",
+        "startTime": 0,
+        "status": ""
+      },
+      "teams": [
+        {
+          "teamId": "team-1",
+          "name": "Team A",
+          "avatar": "",
+          "bindingGift": "Rose",
+          "scoreMultipliers": {},
+          "streamers": [
+            {
+              "id": "",
+              "bigoId": "",
+              "bigoRoomId": "1",
+              "name": "Streamer 1",
+              "avatar": "",
+              "bindingGift": "Rose"
+            },
+            {
+              "id": "idol-1767853869934",
+              "bigoId": "connam29",
+              "bigoRoomId": "connam29",
+              "name": "connam29",
+              "avatar": "",
+              "bindingGift": "Rose"
+            }
+          ]
+        },
+        {
+          "teamId": "team-2",
+          "name": "Team B",
+          "avatar": "",
+          "bindingGift": "Diamond",
+          "scoreMultipliers": {},
+          "streamers": [
+            {
+              "id": "",
+              "bigoId": "",
+              "bigoRoomId": "2",
+              "name": "Streamer 2",
+              "avatar": "",
+              "bindingGift": "Diamond"
+            },
+            {
+              "id": "idol-1767853871093",
+              "bigoId": "comnam29",
+              "bigoRoomId": "comnam29",
+              "name": "Hồ Ly🦊",
+              "avatar": "http://esx.bigo.sg/live/4hy/1uACIZ00y2fSMaf0X3dLZ_4.jpg?type=20\u0026auth-token=1UL42eVJHt9OfMJGmVe-fS2eOm0st5Ekc_Bo-ocBS0U:eyJhIjo2MCwiYyI6ImJpZ29fZGJfcXJ5LWEtIiwiZSI6MTc2ODAyNjg1MSwicyI6IjEifQ",
+              "bindingGift": "Diamond"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "756be30b-8842-410a-9027-cb0acd9fa650",
+    "name": "1100502274",
+    "roomId": "1100502274",
+    "createdAt": "2026-01-11T19:39:33.7715511+07:00",
+    "updatedAt": "2026-01-11T21:51:30.1166031+07:00",
+    "lastUsedAt": null,
+    "bigoAvatar": "",
+    "bigoNickName": "",
+    "config": {
+      "roomId": "1100502274",
+      "agencyId": 1,
+      "session": {
+        "sessionId": "",
+        "startTime": 0,
+        "status": ""
+      },
+      "teams": [
+        {
+          "teamId": "team-1768135161223",
+          "name": "Team 1",
+          "avatar": "",
+          "bindingGift": "Kiss",
+          "scoreMultipliers": {},
+          "streamers": [
+            {
+              "id": "idol-1768135164690",
+              "bigoId": "connam29",
+              "bigoRoomId": "connam29",
+              "name": "connam29",
+              "avatar": "",
+              "bindingGift": "Rose"
+            }
+          ]
+        },
+        {
+          "teamId": "team-1768135162198",
+          "name": "Team 2",
+          "avatar": "",
+          "bindingGift": "Flower",
+          "scoreMultipliers": {},
+          "streamers": [
+            {
+              "id": "idol-1768135166280",
+              "bigoId": "comnam29",
+              "bigoRoomId": "comnam29",
+              "name": "Hồ Ly🦊",
+              "avatar": "http://esx.bigo.sg/live/4hy/1uACIZ00y2fSMaf0X3dLZ_4.jpg?type=20\u0026auth-token=1UL42eVJHt9OfMJGmVe-fS2eOm0st5Ekc_Bo-ocBS0U:eyJhIjo2MCwiYyI6ImJpZ29fZGJfcXJ5LWEtIiwiZSI6MTc2ODAyNjg1MSwicyI6IjEifQ",
+              "bindingGift": "Rose"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "ad46b734-1081-4eb3-9101-60e1ad3aad2e",
+    "name": "807601168",
+    "roomId": "807601168",
+    "createdAt": "2026-01-10T11:14:17.2330384+07:00",
+    "updatedAt": "2026-01-10T14:08:20.1254937+07:00",
+    "lastUsedAt": null,
+    "bigoAvatar": "",
+    "bigoNickName": "",
+    "config": {
+      "roomId": "807601168",
+      "agencyId": 1,
+      "session": {
+        "sessionId": "",
+        "startTime": 0,
+        "status": ""
+      },
+      "teams": [
+        {
+          "teamId": "team-1768018464998",
+          "name": "Team 1",
+          "avatar": "",
+          "bindingGift": "Rose",
+          "scoreMultipliers": {},
+          "streamers": [
+            {
+              "id": "idol-1768018469616",
+              "bigoId": "connam29",
+              "bigoRoomId": "connam29",
+              "name": "connam29",
+              "avatar": "",
+              "bindingGift": "Rose"
+            }
+          ]
+        },
+        {
+          "teamId": "team-1768018466873",
+          "name": "Team 2",
+          "avatar": "",
+          "bindingGift": "Rose",
+          "scoreMultipliers": {},
+          "streamers": [
+            {
+              "id": "idol-1768018484634",
+              "bigoId": "comnam29",
+              "bigoRoomId": "comnam29",
+              "name": "Hồ Ly🦊",
+              "avatar": "http://esx.bigo.sg/live/4hy/1uACIZ00y2fSMaf0X3dLZ_4.jpg?type=20\u0026auth-token=1UL42eVJHt9OfMJGmVe-fS2eOm0st5Ekc_Bo-ocBS0U:eyJhIjo2MCwiYyI6ImJpZ29fZGJfcXJ5LWEtIiwiZSI6MTc2ODAyNjg1MSwicyI6IjEifQ",
+              "bindingGift": "Rose"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "6b755023-7c84-468a-8ea4-e7b68bb9407b",
+    "name": "1024657245",
+    "roomId": "1024657245",
+    "createdAt": "2026-01-10T14:14:17.5148459+07:00",
+    "updatedAt": "2026-01-10T18:01:15.4578596+07:00",
+    "lastUsedAt": null,
+    "bigoAvatar": "",
+    "bigoNickName": "",
+    "config": {
+      "roomId": "1024657245",
+      "agencyId": 1,
+      "session": {
+        "sessionId": "",
+        "startTime": 0,
+        "status": ""
+      },
+      "teams": [
+        {
+          "teamId": "team-1768029270137",
+          "name": "Team 1",
+          "avatar": "",
+          "bindingGift": "Kiss",
+          "scoreMultipliers": {},
+          "streamers": [
+            {
+              "id": "idol-1768029273861",
+              "bigoId": "connam29",
+              "bigoRoomId": "connam29",
+              "name": "connam29",
+              "avatar": "",
+              "bindingGift": "Rose"
+            }
+          ]
+        },
+        {
+          "teamId": "team-1768029270820",
+          "name": "Team 2",
+          "avatar": "",
+          "bindingGift": "Flower",
+          "scoreMultipliers": {},
+          "streamers": [
+            {
+              "id": "idol-1768029275308",
+              "bigoId": "comnam29",
+              "bigoRoomId": "comnam29",
+              "name": "Hồ Ly🦊",
+              "avatar": "http://esx.bigo.sg/live/4hy/1uACIZ00y2fSMaf0X3dLZ_4.jpg?type=20\u0026auth-token=1UL42eVJHt9OfMJGmVe-fS2eOm0st5Ekc_Bo-ocBS0U:eyJhIjo2MCwiYyI6ImJpZ29fZGJfcXJ5LWEtIiwiZSI6MTc2ODAyNjg1MSwicyI6IjEifQ",
+              "bindingGift": "Rose"
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

@@ -109,7 +109,7 @@ export namespace api {
 		}
 	}
 	export class Streamer {
-	    streamerId: string;
+	    id: string;
 	    bigoId: string;
 	    bigoRoomId: string;
 	    name: string;
@@ -122,7 +122,7 @@ export namespace api {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.streamerId = source["streamerId"];
+	        this.id = source["id"];
 	        this.bigoId = source["bigoId"];
 	        this.bigoRoomId = source["bigoRoomId"];
 	        this.name = source["name"];
@@ -133,6 +133,7 @@ export namespace api {
 	export class Team {
 	    teamId: string;
 	    name: string;
+	    avatar: string;
 	    bindingGift: string;
 	    scoreMultipliers: Record<string, number>;
 	    streamers: Streamer[];
@@ -145,6 +146,7 @@ export namespace api {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.teamId = source["teamId"];
 	        this.name = source["name"];
+	        this.avatar = source["avatar"];
 	        this.bindingGift = source["bindingGift"];
 	        this.scoreMultipliers = source["scoreMultipliers"];
 	        this.streamers = this.convertValues(source["streamers"], Streamer);
@@ -242,6 +244,40 @@ export namespace api {
 	        this.error = source["error"];
 	    }
 	}
+	export class GiftDefinition {
+	    id: string;
+	    name: string;
+	    diamonds: number;
+	    image: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GiftDefinition(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.diamonds = source["diamonds"];
+	        this.image = source["image"];
+	    }
+	}
+	export class GlobalIdol {
+	    name: string;
+	    bigoRoomId: string;
+	    avatar: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GlobalIdol(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.bigoRoomId = source["bigoRoomId"];
+	        this.avatar = source["avatar"];
+	    }
+	}
 	
 	
 	
@@ -281,6 +317,67 @@ export namespace api {
 
 }
 
+export namespace listener {
+	
+	export class BigoGift {
+	    SenderId: string;
+	    SenderName: string;
+	    SenderAvatar: string;
+	    SenderLevel: number;
+	    StreamerId: string;
+	    StreamerName: string;
+	    StreamerAvatar: string;
+	    GiftId: string;
+	    GiftName: string;
+	    GiftCount: number;
+	    Diamonds: number;
+	    GiftImageUrl: string;
+	    Timestamp: number;
+	    BigoRoomId: string;
+	    RoomTotalDiamonds: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BigoGift(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.SenderId = source["SenderId"];
+	        this.SenderName = source["SenderName"];
+	        this.SenderAvatar = source["SenderAvatar"];
+	        this.SenderLevel = source["SenderLevel"];
+	        this.StreamerId = source["StreamerId"];
+	        this.StreamerName = source["StreamerName"];
+	        this.StreamerAvatar = source["StreamerAvatar"];
+	        this.GiftId = source["GiftId"];
+	        this.GiftName = source["GiftName"];
+	        this.GiftCount = source["GiftCount"];
+	        this.Diamonds = source["Diamonds"];
+	        this.GiftImageUrl = source["GiftImageUrl"];
+	        this.Timestamp = source["Timestamp"];
+	        this.BigoRoomId = source["BigoRoomId"];
+	        this.RoomTotalDiamonds = source["RoomTotalDiamonds"];
+	    }
+	}
+	export class BigoUserInfo {
+	    avatar: string;
+	    nick_name: string;
+	    yyuid: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BigoUserInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.avatar = source["avatar"];
+	        this.nick_name = source["nick_name"];
+	        this.yyuid = source["yyuid"];
+	    }
+	}
+
+}
+
 export namespace profile {
 	
 	export class Profile {
@@ -293,6 +390,8 @@ export namespace profile {
 	    updatedAt: any;
 	    // Go type: time
 	    lastUsedAt?: any;
+	    bigoAvatar: string;
+	    bigoNickName: string;
 	    config: api.Config;
 	
 	    static createFrom(source: any = {}) {
@@ -307,6 +406,8 @@ export namespace profile {
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.updatedAt = this.convertValues(source["updatedAt"], null);
 	        this.lastUsedAt = this.convertValues(source["lastUsedAt"], null);
+	        this.bigoAvatar = source["bigoAvatar"];
+	        this.bigoNickName = source["bigoNickName"];
 	        this.config = this.convertValues(source["config"], api.Config);
 	    }
 	
@@ -333,6 +434,116 @@ export namespace profile {
 
 export namespace session {
 	
+	export class BBCoreStreamStatus {
+	    isActive: boolean;
+	    sessionId: string;
+	    roomId: string;
+	    deviceHash: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BBCoreStreamStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isActive = source["isActive"];
+	        this.sessionId = source["sessionId"];
+	        this.roomId = source["roomId"];
+	        this.deviceHash = source["deviceHash"];
+	    }
+	}
+	export class BigoConnection {
+	    bigoRoomId: string;
+	    bigoId: string;
+	    idolName: string;
+	    avatar: string;
+	    username: string;
+	    status: string;
+	    messagesReceived: number;
+	    // Go type: time
+	    lastMessageAt: any;
+	    totalDiamonds: number;
+	    error: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BigoConnection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bigoRoomId = source["bigoRoomId"];
+	        this.bigoId = source["bigoId"];
+	        this.idolName = source["idolName"];
+	        this.avatar = source["avatar"];
+	        this.username = source["username"];
+	        this.status = source["status"];
+	        this.messagesReceived = source["messagesReceived"];
+	        this.lastMessageAt = this.convertValues(source["lastMessageAt"], null);
+	        this.totalDiamonds = source["totalDiamonds"];
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class BigoListenerStatus {
+	    isActive: boolean;
+	    // Go type: time
+	    startTime: any;
+	    totalIdols: number;
+	    connectedIdols: number;
+	    bufferedEvents: number;
+	    connections: BigoConnection[];
+	    recentGifts: listener.BigoGift[];
+	
+	    static createFrom(source: any = {}) {
+	        return new BigoListenerStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isActive = source["isActive"];
+	        this.startTime = this.convertValues(source["startTime"], null);
+	        this.totalIdols = source["totalIdols"];
+	        this.connectedIdols = source["connectedIdols"];
+	        this.bufferedEvents = source["bufferedEvents"];
+	        this.connections = this.convertValues(source["connections"], BigoConnection);
+	        this.recentGifts = this.convertValues(source["recentGifts"], listener.BigoGift);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Status {
 	    roomId: string;
 	    sessionId: string;

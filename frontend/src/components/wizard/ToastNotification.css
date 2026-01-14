@@ -66,32 +66,52 @@
 /* Toast type colors */
 .toast-success {
   border-left: 4px solid #10b981;
+  background: #f0fdf4;
 }
 
 .toast-success .toast-icon {
   color: #10b981;
 }
 
+.toast-success .toast-message {
+  color: #065f46;
+}
+
 .toast-error {
   border-left: 4px solid #ef4444;
+  background: #fef2f2;
 }
 
 .toast-error .toast-icon {
   color: #ef4444;
 }
 
+.toast-error .toast-message {
+  color: #991b1b;
+}
+
 .toast-warning {
   border-left: 4px solid #f59e0b;
+  background: #fffbeb;
 }
 
 .toast-warning .toast-icon {
   color: #f59e0b;
 }
 
+.toast-warning .toast-message {
+  color: #92400e;
+}
+
 .toast-info {
   border-left: 4px solid #3b82f6;
+  background: #eff6ff;
 }
 
 .toast-info .toast-icon {
   color: #3b82f6;
+}
+
+.toast-info .toast-message {
+  color: #1e40af;
 }

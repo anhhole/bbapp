@@ -19,8 +19,8 @@ type Client struct {
 
 func NewClient(baseURL, authToken string) *Client {
 	return &Client{
-		baseURL:    baseURL,
-		authToken:  authToken,
+		baseURL:   baseURL,
+		authToken: authToken,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -33,9 +33,14 @@ func (c *Client) SetTokens(accessToken, refreshToken string) {
 	c.refreshToken = refreshToken
 }
 
+// GetAccessToken returns the current access token
+func (c *Client) GetAccessToken() string {
+	return c.authToken
+}
+
 func (c *Client) GetConfig(roomId string) (*Config, error) {
 	// Migrated to official BB-Core API endpoint
-	url := fmt.Sprintf("%s/api/v1/external/config", c.baseURL)
+	url := fmt.Sprintf("%s/api/v1/external/config?roomId=%s", c.baseURL, roomId)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -55,25 +60,30 @@ func (c *Client) GetConfig(roomId string) (*Config, error) {
 
 // SaveConfig saves room configuration to BB-Core
 func (c *Client) SaveConfig(roomId string, config *Config) error {
-	// Migrated to official BB-Core API endpoint
-	url := fmt.Sprintf("%s/api/v1/external/config", c.baseURL)
+	// Force the config RoomID to match the requested RoomID
+	// This prevents issues where the config object has "default" or mismatching IDs
+	config.RoomId = roomId
 
-	// Wrap config in BbappConfigRequest structure
-	requestBody := map[string]interface{}{
-		"configData":  config,
-		"description": "BBapp PK Mode Configuration",
-		"isActive":    true,
+	// Migrated to official BB-Core API endpoint
+	url := fmt.Sprintf("%s/api/v1/external/config?roomId=%s", c.baseURL, roomId)
+
+	// Wrap config in the expected DTO
+	reqBody := SaveConfigRequest{
+		RoomId:      roomId,
+		ConfigData:  *config,
+		Description: "Updated via BBApp",
+		IsActive:    true,
 	}
 
-	jsonData, err := json.Marshal(requestBody)
+	// Marshal config wrapper
+	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
 
-	// Debug logging
+	// Debug logging - FULL PAYLOAD
 	fmt.Printf("[SaveConfig] URL: %s\n", url)
-	fmt.Printf("[SaveConfig] JSON length: %d bytes\n", len(jsonData))
-	fmt.Printf("[SaveConfig] JSON preview: %s\n", string(jsonData[:min(200, len(jsonData))]))
+	fmt.Printf("[SaveConfig] Payload: %s\n", string(jsonData))
 
 	// Use the same pattern as other POST methods
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
@@ -93,21 +103,35 @@ func (c *Client) SaveConfig(roomId string, config *Config) error {
 	return c.doRequest(req, &resp)
 }
 
-func (c *Client) StartSession(roomId string, deviceHash string) (*StartSessionResponse, error) {
-	url := fmt.Sprintf("%s/pk/start-from-bbapp/%s", c.baseURL, roomId)
+// StartSession starts a new PK script session using /api/v1/scripts/start
+func (c *Client) StartSession(roomId string, durationMinutes int, scriptPayload map[string]interface{}) (*StartScriptResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/scripts/start", c.baseURL)
 
-	reqBody := StartSessionRequest{DeviceHash: deviceHash}
-	jsonData, _ := json.Marshal(reqBody)
+	reqBody := StartScriptRequest{
+		RoomId:          roomId,
+		ScriptType:      "PK",
+		DurationMinutes: durationMinutes,
+		ScriptPayload:   scriptPayload,
+	}
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
+	// Enable request body recreation for retries
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(jsonData)), nil
+	}
+
 	req.Header.Set("Authorization", "Bearer "+c.authToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	var resp StartSessionResponse
+	var resp StartScriptResponse
 	if err := c.doRequest(req, &resp); err != nil {
 		return nil, err
 	}
@@ -115,21 +139,30 @@ func (c *Client) StartSession(roomId string, deviceHash string) (*StartSessionRe
 	return &resp, nil
 }
 
-func (c *Client) StopSession(roomId, reason string) (*StopSessionResponse, error) {
-	url := fmt.Sprintf("%s/pk/stop-from-bbapp/%s", c.baseURL, roomId)
+// StopSession stops an active script session using /api/v1/scripts/stop
+func (c *Client) StopSession(sessionId string) (*StopScriptResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/scripts/stop", c.baseURL)
 
-	reqBody := StopSessionRequest{Reason: reason}
-	jsonData, _ := json.Marshal(reqBody)
+	reqBody := StopScriptRequest{SessionId: sessionId}
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
+	// Enable request body recreation for retries
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(jsonData)), nil
+	}
+
 	req.Header.Set("Authorization", "Bearer "+c.authToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	var resp StopSessionResponse
+	var resp StopScriptResponse
 	if err := c.doRequest(req, &resp); err != nil {
 		return nil, err
 	}

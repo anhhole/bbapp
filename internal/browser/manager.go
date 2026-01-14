@@ -27,6 +27,9 @@ func (m *Manager) CreateBrowser(id string) (context.Context, context.CancelFunc,
 		chromedp.Flag("headless", true),
 		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
+		chromedp.Flag("disable-blink-features", "AutomationControlled"),
 	)
 
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)

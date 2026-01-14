@@ -22,11 +22,11 @@ export interface Team {
   avatar?: string;
   bindingGift: string;
   scoreMultipliers?: Record<string, number>;
-  streamers: Streamer[];
+  streamers: Idol[];
 }
 
-export interface Streamer {
-  streamerId: string;
+export interface Idol {
+  id: string;
   bigoId: string;
   bigoRoomId: string;
   name: string;

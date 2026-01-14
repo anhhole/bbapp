@@ -1,5 +1,5 @@
 // Wizard step types
-export type WizardStep = 'profile' | 'config' | 'streamers' | 'review';
+export type WizardStep = 'profile' | 'config' | 'review';
 
 // Wizard state
 export interface WizardState {

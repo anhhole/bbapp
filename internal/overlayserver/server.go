@@ -29,6 +29,12 @@ func NewServer() (*Server, error) {
 func (s *Server) setupRoutes() {
 	// Serve React build (frontend/dist)
 	fs := http.FileServer(http.Dir("./frontend/dist"))
+
+	// specific handler for overlay to support SPA routing
+	s.mux.HandleFunc("/overlay", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./frontend/dist/index.html")
+	})
+
 	s.mux.Handle("/", fs)
 }
 

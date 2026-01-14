@@ -1,9 +1,9 @@
 package listener_test
 
 import (
-	"testing"
-	"bbapp/internal/listener"
 	"bbapp/internal/browser"
+	"bbapp/internal/listener"
+	"testing"
 )
 
 func TestBigoListener_Start(t *testing.T) {
@@ -18,7 +18,7 @@ func TestBigoListener_Start(t *testing.T) {
 		frameCount++
 	})
 
-	err := bigoListener.Start()
+	_, err := bigoListener.Start()
 	if err != nil {
 		t.Fatalf("Start failed: %v", err)
 	}

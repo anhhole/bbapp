@@ -18,20 +18,40 @@ export function DeleteProfile(arg1) {
   return window['go']['main']['App']['DeleteProfile'](arg1);
 }
 
+export function FetchBigoUser(arg1) {
+  return window['go']['main']['App']['FetchBigoUser'](arg1);
+}
+
 export function FetchConfig(arg1) {
   return window['go']['main']['App']['FetchConfig'](arg1);
+}
+
+export function FetchGlobalIdols() {
+  return window['go']['main']['App']['FetchGlobalIdols']();
 }
 
 export function GetBBAppConfig(arg1) {
   return window['go']['main']['App']['GetBBAppConfig'](arg1);
 }
 
+export function GetBBCoreStreamStatus() {
+  return window['go']['main']['App']['GetBBCoreStreamStatus']();
+}
+
 export function GetBBCoreURL() {
   return window['go']['main']['App']['GetBBCoreURL']();
 }
 
+export function GetBigoListenerStatus() {
+  return window['go']['main']['App']['GetBigoListenerStatus']();
+}
+
 export function GetConnections() {
   return window['go']['main']['App']['GetConnections']();
+}
+
+export function GetGiftLibrary() {
+  return window['go']['main']['App']['GetGiftLibrary']();
 }
 
 export function GetOverlayURL(arg1, arg2, arg3) {
@@ -70,12 +90,40 @@ export function RemoveStreamer(arg1) {
   return window['go']['main']['App']['RemoveStreamer'](arg1);
 }
 
+export function ResetSession() {
+  return window['go']['main']['App']['ResetSession']();
+}
+
 export function SaveBBAppConfig(arg1, arg2) {
   return window['go']['main']['App']['SaveBBAppConfig'](arg1, arg2);
 }
 
-export function StartPKSession(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['StartPKSession'](arg1, arg2, arg3, arg4);
+export function SaveGiftLibrary(arg1) {
+  return window['go']['main']['App']['SaveGiftLibrary'](arg1);
+}
+
+export function SaveGlobalIdols(arg1) {
+  return window['go']['main']['App']['SaveGlobalIdols'](arg1);
+}
+
+export function StartBBCoreStream(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartBBCoreStream'](arg1, arg2, arg3);
+}
+
+export function StartBigoListener(arg1) {
+  return window['go']['main']['App']['StartBigoListener'](arg1);
+}
+
+export function StartPKSession(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['StartPKSession'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function StopBBCoreStream(arg1) {
+  return window['go']['main']['App']['StopBBCoreStream'](arg1);
+}
+
+export function StopBigoListener() {
+  return window['go']['main']['App']['StopBigoListener']();
 }
 
 export function StopPKSession(arg1) {
@@ -84,6 +132,10 @@ export function StopPKSession(arg1) {
 
 export function UpdateProfile(arg1, arg2) {
   return window['go']['main']['App']['UpdateProfile'](arg1, arg2);
+}
+
+export function UpdateProfileBigoInfo(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateProfileBigoInfo'](arg1, arg2, arg3);
 }
 
 export function ValidateTrial(arg1) {

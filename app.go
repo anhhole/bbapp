@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -37,6 +39,7 @@ type App struct {
 	bbCoreURL      string
 	apiClient      *api.Client
 	profileManager *profile.Manager
+	giftLibrary    []api.GiftDefinition
 }
 
 // NewApp creates new App
@@ -106,34 +109,48 @@ func (a *App) startup(ctx context.Context) {
 		fmt.Println("[App] Debug frames directory ready (./debug_frames)")
 	}
 
+	// Load Gift Library
+	a.giftLibrary = a.loadGiftLibraryFromFile()
+	if len(a.giftLibrary) == 0 {
+		fmt.Printf("[App] WARNING: Gift library is empty or failed to load\n")
+	} else {
+		fmt.Printf("[App] Gift library loaded in startup (%d items)\n", len(a.giftLibrary))
+	}
+
 	fmt.Println("[App] Startup complete - ready to connect to BB-Core")
 }
 
 // shutdown is called on app termination
 func (a *App) shutdown(ctx context.Context) {
 	fmt.Println("[App] Shutting down BBapp...")
-	
+
 	if a.stompClient != nil {
 		fmt.Println("[App] Disconnecting from BB-Core STOMP...")
 		a.stompClient.Disconnect()
 	}
-	
+
+	// Ensure all browser instances are closed
+	fmt.Println("[App] Stopping all sessions and browsers...")
+	if err := a.StopPKSession("App shutdown"); err != nil {
+		fmt.Printf("[App] WARNING: Error stopping sessions during shutdown: %v\n", err)
+	}
+
 	if a.logger != nil {
 		fmt.Println("[App] Closing activity logger...")
 		a.logger.Close()
 	}
-	
+
 	fmt.Println("[App] Shutdown complete")
 }
 
 // ConnectToCore connects to BB-Core STOMP
 func (a *App) ConnectToCore(url, username, password string) error {
 	fmt.Printf("[App] Connecting to BB-Core STOMP at: %s\n", url)
-	
+
 	if username != "" {
 		fmt.Println("[App] Using authentication token")
 	}
-	
+
 	client, err := stomp.NewClient(url, username, password)
 	if err != nil {
 		fmt.Printf("[App] ERROR: STOMP connection failed: %v\n", err)
@@ -148,7 +165,7 @@ func (a *App) ConnectToCore(url, username, password string) error {
 // AddStreamer adds Bigo streamer to monitor
 func (a *App) AddStreamer(bigoRoomId, teamId, roomId string) error {
 	fmt.Printf("[App] AddStreamer called: bigoRoom=%s, team=%s, room=%s\n", bigoRoomId, teamId, roomId)
-	
+
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -173,7 +190,7 @@ func (a *App) AddStreamer(bigoRoomId, teamId, roomId string) error {
 	// Create listener
 	bigoListener := listener.NewBigoListener(bigoRoomId, ctx)
 	fmt.Printf("[App] BigoListener created for room: %s\n", bigoRoomId)
-	
+
 	// Enable debug mode to capture ALL raw WebSocket frames
 	debugFilePath := fmt.Sprintf("./debug_frames/room_%s.log", bigoRoomId)
 	if err := bigoListener.EnableDebugMode(debugFilePath); err != nil {
@@ -186,6 +203,21 @@ func (a *App) AddStreamer(bigoRoomId, teamId, roomId string) error {
 	bigoListener.OnGift(func(gift listener.Gift) {
 		fmt.Printf("[App] 🎁 GIFT RECEIVED: %s (%d diamonds) from %s in room %s\n",
 			gift.GiftName, gift.Diamonds, gift.SenderName, bigoRoomId)
+
+		// Check library for diamond override/lookup
+		// Bigo often sends 0 for specific gifts, or we want to override values
+		for _, def := range a.giftLibrary {
+			// Match by ID if possible, otherwise by Name
+			if (def.ID != "" && def.ID == gift.GiftId) || (strings.EqualFold(def.Name, gift.GiftName)) {
+				// Only override if the library has a value (and potentially if the event value is 0 or different)
+				// For now, let's treat the Library as the source of truth if it has a non-zero value
+				if def.Diamonds > 0 {
+					// fmt.Printf("[App] Overriding gift value for %s: %d -> %d\n", gift.GiftName, gift.Diamonds, def.Diamonds)
+					gift.Diamonds = int64(def.Diamonds)
+				}
+				break
+			}
+		}
 
 		// Log activity
 		if err := a.logger.LogGift(bigoRoomId, gift.SenderName, gift.GiftName, gift.Diamonds); err != nil {
@@ -259,7 +291,7 @@ func (a *App) AddStreamer(bigoRoomId, teamId, roomId string) error {
 
 	// Start listening
 	fmt.Printf("[App] Starting WebSocket listener for room: %s\n", bigoRoomId)
-	if err := bigoListener.Start(); err != nil {
+	if _, err := bigoListener.Start(); err != nil {
 		fmt.Printf("[App] ERROR: Failed to start listener: %v\n", err)
 		cancel()
 		return err
@@ -273,7 +305,7 @@ func (a *App) AddStreamer(bigoRoomId, teamId, roomId string) error {
 // RemoveStreamer stops monitoring a streamer
 func (a *App) RemoveStreamer(bigoRoomId string) error {
 	fmt.Printf("[App] RemoveStreamer called for room: %s\n", bigoRoomId)
-	
+
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -289,7 +321,7 @@ func (a *App) RemoveStreamer(bigoRoomId string) error {
 	}
 
 	delete(a.listeners, bigoRoomId)
-	
+
 	fmt.Printf("[App] ✓ Stopped monitoring room: %s\n", bigoRoomId)
 	return nil
 }
@@ -311,8 +343,8 @@ func (a *App) GetConnections() []map[string]string {
 
 // StartPKSession starts a complete PK session with BB-Core integration
 // Takes roomId and config from the wizard (config already fetched and validated)
-func (a *App) StartPKSession(bbCoreUrl, authToken, roomId string, cfg api.Config) error {
-	fmt.Printf("[App] Starting PK session for room: %s\n", roomId)
+func (a *App) StartPKSession(bbCoreUrl, authToken, roomId string, cfg api.Config, durationMinutes int) error {
+	fmt.Printf("[App] Starting PK session for room: %s (duration: %dm)\n", roomId, durationMinutes)
 
 	// Generate device hash if not already set
 	if a.deviceHash == "" {
@@ -334,11 +366,23 @@ func (a *App) StartPKSession(bbCoreUrl, authToken, roomId string, cfg api.Config
 	// Initialize session manager
 	a.session = session.NewManager()
 	a.session.Initialize(a.apiClient, a.deviceHash)
+
+	// Force reload Gift Library to ensure freshness
+	fmt.Println("[App] Reloading Gift Library from file before session start...")
+	a.giftLibrary = a.loadGiftLibraryFromFile()
+
+	// Inject Gift Library
+	fmt.Printf("[App] Injecting Gift Library to session (Size: %d)\n", len(a.giftLibrary))
+	if len(a.giftLibrary) == 0 {
+		fmt.Println("[App] WARNING: Injecting EMPTY gift library! Overrides will not work.")
+	}
+	a.session.SetGiftLibrary(a.giftLibrary)
+
 	fmt.Printf("[App] Session manager initialized\n")
 
 	// Start session (validates trial, connects STOMP, starts heartbeat)
 	// Enhanced session manager now handles everything
-	if err := a.session.Start(roomId, &cfg, bbCoreUrl, authToken); err != nil {
+	if err := a.session.Start(roomId, &cfg, bbCoreUrl, authToken, durationMinutes); err != nil {
 		return fmt.Errorf("session start failed: %w", err)
 	}
 
@@ -390,12 +434,147 @@ func (a *App) StopPKSession(reason string) error {
 	return nil
 }
 
+// ResetSession completely wipes the current session manager and creates a new one
+func (a *App) ResetSession() error {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	fmt.Println("[App] Force resetting session manager...")
+	if a.session != nil {
+		a.session.Stop("Force reset")
+	}
+
+	a.session = session.NewManager()
+	if a.apiClient != nil {
+		a.session.Initialize(a.apiClient, a.deviceHash)
+	}
+	fmt.Println("[App] ✓ Session manager reset")
+	return nil
+}
+
+// ensureSessionManager is a safety check to ensure session manager is initialized
+func (a *App) ensureSessionManager() error {
+	// Always inject the latest library to be safe, even if session exists
+	if a.session != nil {
+		if len(a.giftLibrary) > 0 {
+			a.session.SetGiftLibrary(a.giftLibrary)
+		}
+		return nil
+	}
+
+	// Try to initialize using existing client
+	if a.apiClient == nil {
+		return fmt.Errorf("session manager not initialized and API client missing - please login again")
+	}
+
+	fmt.Printf("[App] Safety initializing session manager...\n")
+
+	// Generate device hash if not set
+	if a.deviceHash == "" {
+		deviceHash, err := fingerprint.GenerateDeviceHash()
+		if err != nil {
+			fmt.Printf("[App] ERROR: Safety initialization failed to generate device hash: %v\n", err)
+		} else {
+			a.deviceHash = deviceHash
+		}
+	}
+
+	a.session = session.NewManager()
+	a.session.Initialize(a.apiClient, a.deviceHash)
+	// Inject Gift Library
+	fmt.Printf("[App] Injecting Gift Library to safety session (Size: %d)\n", len(a.giftLibrary))
+	a.session.SetGiftLibrary(a.giftLibrary)
+
+	fmt.Printf("[App] Session manager safety initialized\n")
+	return nil
+}
+
 // GetSessionStatus returns current session status
 func (a *App) GetSessionStatus() session.Status {
 	if a.session == nil {
 		return session.Status{IsActive: false}
 	}
 	return a.session.GetStatus()
+}
+
+// StartBigoListener starts only the Bigo listener session
+func (a *App) StartBigoListener(cfg api.Config) error {
+	fmt.Printf("[App] StartBigoListener called. Session address: %p\n", a.session)
+	if err := a.ensureSessionManager(); err != nil {
+		return err
+	}
+
+	// Ensure library is set before starting
+	if len(a.giftLibrary) > 0 && a.session != nil {
+		a.session.SetGiftLibrary(a.giftLibrary)
+	}
+
+	fmt.Printf("[App] Using session manager at %p\n", a.session)
+	return a.session.StartBigoListener(&cfg)
+}
+
+// StopBigoListener stops only the Bigo listener session
+func (a *App) StopBigoListener() error {
+	if err := a.ensureSessionManager(); err != nil {
+		return err
+	}
+	return a.session.StopBigoListener()
+}
+
+// StartBBCoreStream starts only the BB-Core streaming session
+func (a *App) StartBBCoreStream(roomId string, cfg api.Config, durationMinutes int) error {
+	if err := a.ensureSessionManager(); err != nil {
+		return err
+	}
+
+	// Ensure config has correct room ID
+	cfg.RoomId = roomId
+
+	// Save configuration to ensure backend has the latest teams data
+	// This fixes the "Room has 0 teams" error
+	if err := a.SaveBBAppConfig(roomId, cfg); err != nil {
+		fmt.Printf("[App] WARNING: Failed to save config before stream start: %v\n", err)
+		// We could return error here, but we'll try to proceed in case it was a network glitch
+		// and the config was already saved previously.
+		// return fmt.Errorf("failed to save config: %w", err)
+	} else {
+		fmt.Printf("[App] ✓ Config saved to BB-Core before stream start\n")
+	}
+
+	// Get BB-Core URL and access token
+	bbCoreURL := a.bbCoreURL
+	accessToken := ""
+	if a.apiClient != nil {
+		accessToken = a.apiClient.GetAccessToken()
+	}
+
+	return a.session.StartBBCoreStream(roomId, &cfg, bbCoreURL, accessToken, durationMinutes)
+}
+
+// StopBBCoreStream stops only the BB-Core streaming session
+func (a *App) StopBBCoreStream(reason string) error {
+	if err := a.ensureSessionManager(); err != nil {
+		return err
+	}
+	return a.session.StopBBCoreStream(reason)
+}
+
+// GetBigoListenerStatus returns the status of the Bigo listener session
+func (a *App) GetBigoListenerStatus() session.BigoListenerStatus {
+	if a.session == nil {
+		return session.BigoListenerStatus{}
+	}
+	status := a.session.GetBigoListenerStatus()
+	// fmt.Printf("[App] GetBigoListenerStatus from %p: active=%v, idols=%d\n", a.session, status.IsActive, status.TotalIdols)
+	return status
+}
+
+// GetBBCoreStreamStatus returns the status of the BB-Core stream session
+func (a *App) GetBBCoreStreamStatus() session.BBCoreStreamStatus {
+	if a.session == nil {
+		return session.BBCoreStreamStatus{}
+	}
+	return a.session.GetBBCoreStreamStatus()
 }
 
 // addBigoListenerForSession adds a Bigo listener for session-based workflow
@@ -474,7 +653,7 @@ func (a *App) addBigoListenerForSession(bigoRoomId, roomId string) error {
 	})
 
 	// Start listening
-	if err := bigoListener.Start(); err != nil {
+	if _, err := bigoListener.Start(); err != nil {
 		return err
 	}
 
@@ -497,8 +676,15 @@ func (a *App) GetOverlayURL(scene, roomId, token string) string {
 	}
 
 	baseURL := a.overlayServer.GetURL()
-	return fmt.Sprintf("%s/overlay?scene=%s&roomId=%s&bbCoreUrl=%s&token=%s",
-		baseURL, scene, roomId, a.bbCoreURL, token)
+
+	// Use url.Values for safe encoding
+	params := url.Values{}
+	params.Add("scene", scene)
+	params.Add("roomId", roomId)
+	params.Add("bbCoreUrl", a.bbCoreURL)
+	params.Add("token", token)
+
+	return fmt.Sprintf("%s/overlay?%s", baseURL, params.Encode())
 }
 
 // GetBBCoreURL returns the configured BB-Core base URL from environment.
@@ -511,7 +697,31 @@ func (a *App) GetBBCoreURL() string {
 // This must be called before GetBBAppConfig.
 func (a *App) InitializeBBCoreClient(bbCoreUrl, authToken string) error {
 	a.apiClient = api.NewClient(bbCoreUrl, authToken)
+	a.bbCoreURL = bbCoreUrl
 	fmt.Printf("[App] BB-Core API client initialized: %s\n", bbCoreUrl)
+
+	// Initialize session manager if not already set
+	if a.session == nil {
+		// Generate device hash if not yet set
+		if a.deviceHash == "" {
+			deviceHash, err := fingerprint.GenerateDeviceHash()
+			if err != nil {
+				fmt.Printf("[App] ERROR: Failed to generate device hash: %v\n", err)
+			} else {
+				a.deviceHash = deviceHash
+				fmt.Printf("[App] Device hash initialized: %s\n", a.deviceHash)
+			}
+		}
+
+		a.session = session.NewManager()
+		a.session.Initialize(a.apiClient, a.deviceHash)
+		// Inject Gift Library
+		fmt.Printf("[App] Injecting Gift Library in InitializeBBCoreClient (Size: %d)\n", len(a.giftLibrary))
+		a.session.SetGiftLibrary(a.giftLibrary)
+
+		fmt.Printf("[App] Session manager initialized\n")
+	}
+
 	return nil
 }
 
@@ -567,6 +777,14 @@ func (a *App) UpdateProfile(id string, config api.Config) (*profile.Profile, err
 	return a.profileManager.UpdateProfile(id, config)
 }
 
+// UpdateProfileBigoInfo updates a profile's Bigo info
+func (a *App) UpdateProfileBigoInfo(id, avatar, nickname string) (*profile.Profile, error) {
+	if a.profileManager == nil {
+		return nil, fmt.Errorf("profile manager not initialized")
+	}
+	return a.profileManager.UpdateProfileBigoInfo(id, avatar, nickname)
+}
+
 // DeleteProfile deletes a profile by ID
 func (a *App) DeleteProfile(id string) error {
 	if a.profileManager == nil {
@@ -592,17 +810,17 @@ func (a *App) Login(username, password string) (*api.AuthResponse, error) {
 	if client == nil {
 		client = api.NewClient(a.bbCoreURL, "")
 	}
-	
+
 	authResp, err := client.Login(username, password)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Update API client with new tokens
 	if a.apiClient != nil {
 		a.apiClient.SetTokens(authResp.AccessToken, authResp.RefreshToken)
 	}
-	
+
 	return authResp, nil
 }
 
@@ -613,17 +831,17 @@ func (a *App) Register(username, email, password, agencyName, firstName, lastNam
 	if client == nil {
 		client = api.NewClient(a.bbCoreURL, "")
 	}
-	
+
 	authResp, err := client.Register(username, email, password, agencyName, firstName, lastName)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Update API client with new tokens
 	if a.apiClient != nil {
 		a.apiClient.SetTokens(authResp.AccessToken, authResp.RefreshToken)
 	}
-	
+
 	return authResp, nil
 }
 
@@ -633,17 +851,17 @@ func (a *App) RefreshAuthToken(refreshToken string) (*api.AuthResponse, error) {
 	if client == nil {
 		client = api.NewClient(a.bbCoreURL, "")
 	}
-	
+
 	authResp, err := client.RefreshToken(refreshToken)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Update API client with new tokens
 	if a.apiClient != nil {
 		a.apiClient.SetTokens(authResp.AccessToken, authResp.RefreshToken)
 	}
-	
+
 	return authResp, nil
 }
 
@@ -660,4 +878,111 @@ func (a *App) ValidateTrial(streamers []api.ValidateTrialStreamer) (*api.Validat
 		return nil, fmt.Errorf("not connected to BB-Core")
 	}
 	return a.apiClient.ValidateTrial(streamers)
+}
+
+// Bigo API Integration
+
+// FetchBigoUser fetches user info from Bigo's official API
+func (a *App) FetchBigoUser(bigoId string) (*listener.BigoUserInfo, error) {
+	return listener.GetUserInfo(bigoId)
+}
+
+// Local Global Idols Persistence
+
+const globalIdolsFile = "global-idols.json"
+
+// FetchGlobalIdols reads the global idols list from a local file
+func (a *App) FetchGlobalIdols() ([]api.GlobalIdol, error) {
+	fmt.Println("[App] Fetching global idols from local file")
+
+	file, err := os.Open(globalIdolsFile)
+	if os.IsNotExist(err) {
+		return []api.GlobalIdol{}, nil // Return empty list if file doesn't exist
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var idols []api.GlobalIdol
+	if err := json.NewDecoder(file).Decode(&idols); err != nil {
+		return nil, fmt.Errorf("failed to decode idols: %v", err)
+	}
+
+	return idols, nil
+}
+
+// SaveGlobalIdols saves the global idols list to a local file
+func (a *App) SaveGlobalIdols(idols []api.GlobalIdol) error {
+	fmt.Printf("[App] Saving %d global idols to local file\n", len(idols))
+
+	file, err := os.Create(globalIdolsFile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(idols); err != nil {
+		return fmt.Errorf("failed to encode idols: %v", err)
+	}
+
+	return nil
+}
+
+// Gift Library Management
+
+// SaveGiftLibrary saves the gift library to disk
+func (a *App) SaveGiftLibrary(gifts []api.GiftDefinition) error {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	a.giftLibrary = gifts
+
+	// Update active session if exists
+	if a.session != nil {
+		fmt.Println("[App] Push updated gift library to active session")
+		a.session.SetGiftLibrary(gifts)
+	}
+
+	// Ensure data directory exists
+	if err := os.MkdirAll("./data", 0755); err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(gifts, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile("./data/gifts.json", data, 0644)
+}
+
+// GetGiftLibrary returns the current gift library
+func (a *App) GetGiftLibrary() []api.GiftDefinition {
+	// a.mutex.RLock()
+	// defer a.mutex.RUnlock()
+	return a.giftLibrary
+}
+
+// loadGiftLibraryFromFile loads from disk (internal use)
+func (a *App) loadGiftLibraryFromFile() []api.GiftDefinition {
+	path := "./data/gifts.json"
+	fmt.Printf("[App] Attempting to load gift library from: %s\n", path)
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Printf("[App] Failed to read gift library file: %v\n", err)
+		return nil
+	}
+
+	var gifts []api.GiftDefinition
+	if err := json.Unmarshal(data, &gifts); err != nil {
+		fmt.Printf("[App] Failed to parse gift library JSON: %v\n", err)
+		return nil
+	}
+
+	fmt.Printf("[App] Successfully loaded %d gifts from file\n", len(gifts))
+	return gifts
 }

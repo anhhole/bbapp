@@ -1,11 +1,11 @@
 package api_test
 
 import (
+	"bbapp/internal/api"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"bbapp/internal/api"
 )
 
 func TestClient_GetConfig(t *testing.T) {
@@ -978,7 +978,7 @@ func TestClient_ValidateTrial_Allowed(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "test-token")
-	
+
 	streamers := []api.ValidateTrialStreamer{
 		{BigoId: "123456789", BigoRoomId: "7269255640400014299"},
 		{BigoId: "987654321", BigoRoomId: "7478500464273093441"},
@@ -1016,7 +1016,7 @@ func TestClient_ValidateTrial_Rejected(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "test-token")
-	
+
 	streamers := []api.ValidateTrialStreamer{
 		{BigoId: "829454322", BigoRoomId: "7478500464273093441"},
 	}

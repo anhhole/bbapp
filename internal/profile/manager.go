@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"bbapp/internal/api"
+
 	"github.com/google/uuid"
 )
 
@@ -223,6 +224,30 @@ func (m *Manager) UpdateProfile(id string, config api.Config) (*Profile, error) 
 
 	// Update config and timestamp
 	profile.Config = config
+	profile.UpdatedAt = time.Now()
+
+	// Save to disk
+	if err := m.saveProfilesLocked(); err != nil {
+		return nil, fmt.Errorf("save profiles: %w", err)
+	}
+
+	return profile, nil
+}
+
+// UpdateProfileBigoInfo updates a profile's Bigo info
+func (m *Manager) UpdateProfileBigoInfo(id, avatar, nickname string) (*Profile, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Find profile
+	profile, exists := m.profiles[id]
+	if !exists {
+		return nil, fmt.Errorf("profile not found: %s", id)
+	}
+
+	// Update fields
+	profile.BigoAvatar = avatar
+	profile.BigoNickName = nickname
 	profile.UpdatedAt = time.Now()
 
 	// Save to disk

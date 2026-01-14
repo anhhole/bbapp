@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Plus } from 'lucide-react';
-import type { Team, Streamer } from '../../../../shared/types';
+import type { Team, Idol } from '../../../../shared/types';
 import './TeamCard.css';
 
 interface TeamCardProps {
@@ -24,34 +24,34 @@ export const TeamCard: React.FC<TeamCardProps> = ({
     onUpdateTeam({ ...team, bindingGift });
   };
 
-  const handleAddStreamer = () => {
-    const newStreamerId = `streamer-${Date.now()}`;
-    const newStreamer: Streamer = {
-      streamerId: newStreamerId,
+  const handleAddIdol = () => {
+    const newIdolId = `idol-${Date.now()}`;
+    const newIdol: Idol = {
+      id: newIdolId,
       bigoId: '',
       bigoRoomId: '',
-      name: `Streamer ${team.streamers.length + 1}`,
+      name: `Idol ${team.streamers.length + 1}`,
       bindingGift: team.bindingGift,
     };
     onUpdateTeam({
       ...team,
-      streamers: [...team.streamers, newStreamer],
+      streamers: [...team.streamers, newIdol],
     });
   };
 
-  const handleUpdateStreamer = (index: number, updatedStreamer: Streamer) => {
-    const updatedStreamers = [...team.streamers];
-    updatedStreamers[index] = updatedStreamer;
-    onUpdateTeam({ ...team, streamers: updatedStreamers });
+  const handleUpdateIdol = (index: number, updatedIdol: Idol) => {
+    const updatedIdols = [...team.streamers];
+    updatedIdols[index] = updatedIdol;
+    onUpdateTeam({ ...team, streamers: updatedIdols });
   };
 
-  const handleRemoveStreamer = (index: number) => {
+  const handleRemoveIdol = (index: number) => {
     if (team.streamers.length <= 1) {
-      alert('Each team must have at least one streamer');
+      alert('Each team must have at least one idol');
       return;
     }
-    const updatedStreamers = team.streamers.filter((_, i) => i !== index);
-    onUpdateTeam({ ...team, streamers: updatedStreamers });
+    const updatedIdols = team.streamers.filter((_, i) => i !== index);
+    onUpdateTeam({ ...team, streamers: updatedIdols });
   };
 
   return (
@@ -92,22 +92,22 @@ export const TeamCard: React.FC<TeamCardProps> = ({
 
         <div className="streamers-section">
           <div className="streamers-header">
-            <label>Streamers:</label>
-            <button className="add-streamer-btn" onClick={handleAddStreamer}>
-              <Plus size={16} /> Add Streamer
+            <label>Idols:</label>
+            <button className="add-streamer-btn" onClick={handleAddIdol}>
+              <Plus size={16} /> Add Idol
             </button>
           </div>
 
           <div className="streamers-list">
-            {team.streamers.map((streamer, index) => (
-              <div key={streamer.streamerId} className="streamer-card">
+            {team.streamers.map((idol, index) => (
+              <div key={idol.id} className="streamer-card">
                 <div className="streamer-header">
-                  <span className="streamer-title">{streamer.name}</span>
+                  <span className="streamer-title">{idol.name}</span>
                   <button
                     className="remove-streamer-btn"
-                    onClick={() => handleRemoveStreamer(index)}
+                    onClick={() => handleRemoveIdol(index)}
                     disabled={team.streamers.length <= 1}
-                    title="Remove streamer"
+                    title="Remove idol"
                   >
                     <X size={14} />
                   </button>
@@ -118,14 +118,14 @@ export const TeamCard: React.FC<TeamCardProps> = ({
                     <label>Name:</label>
                     <input
                       type="text"
-                      value={streamer.name}
+                      value={idol.name}
                       onChange={(e) =>
-                        handleUpdateStreamer(index, {
-                          ...streamer,
+                        handleUpdateIdol(index, {
+                          ...idol,
                           name: e.target.value,
                         })
                       }
-                      placeholder="Streamer name"
+                      placeholder="Idol name"
                     />
                   </div>
 
@@ -133,10 +133,10 @@ export const TeamCard: React.FC<TeamCardProps> = ({
                     <label>Bigo Room ID:</label>
                     <input
                       type="text"
-                      value={streamer.bigoRoomId}
+                      value={idol.bigoRoomId}
                       onChange={(e) =>
-                        handleUpdateStreamer(index, {
-                          ...streamer,
+                        handleUpdateIdol(index, {
+                          ...idol,
                           bigoRoomId: e.target.value,
                         })
                       }
@@ -148,10 +148,10 @@ export const TeamCard: React.FC<TeamCardProps> = ({
                     <label>Binding Gift:</label>
                     <input
                       type="text"
-                      value={streamer.bindingGift}
+                      value={idol.bindingGift}
                       onChange={(e) =>
-                        handleUpdateStreamer(index, {
-                          ...streamer,
+                        handleUpdateIdol(index, {
+                          ...idol,
                           bindingGift: e.target.value,
                         })
                       }

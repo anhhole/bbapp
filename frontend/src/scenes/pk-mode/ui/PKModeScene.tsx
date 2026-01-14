@@ -1,374 +1,79 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { WizardContainer } from '../../../components/wizard/WizardContainer';
+import { SessionControlPanel } from './components/SessionControlPanel';
+import { ToastNotification } from '../../../components/wizard/ToastNotification';
+import { ToastType } from '../../../components/wizard/types';
 import './PKModeScene.css';
-import { GetBBAppConfig, InitializeBBCoreClient, GetBBCoreURL, SaveBBAppConfig, StartPKSession, StopPKSession, GetOverlayURL } from '../../../../wailsjs/go/main/App';
-import type { PKConfig, Team } from '../../../shared/types';
-import { Plus } from 'lucide-react';
-import { TeamCard } from './components/TeamCard';
-import { api } from '../../../../wailsjs/go/models';
 
-interface PKModeSceneProps {
+export interface PKModeSceneProps {
   accessToken: string;
-  onSessionChange: (active: boolean) => void;
+  onSessionChange?: (isActive: boolean) => void;
 }
 
-export const PKModeScene: React.FC<PKModeSceneProps> = ({
-  accessToken,
-  onSessionChange,
-}) => {
-  const [roomId, setRoomId] = useState('');
-  const [config, setConfig] = useState<PKConfig | null>(null);
-  const [configLoaded, setConfigLoaded] = useState(false);
-  const [configSaved, setConfigSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [sessionActive, setSessionActive] = useState(false);
-  const [startingSession, setStartingSession] = useState(false);
-  const [stoppingSession, setStoppingSession] = useState(false);
-  const [overlayUrl, setOverlayUrl] = useState('');
+export function PKModeScene({ accessToken, onSessionChange }: PKModeSceneProps) {
+  const [toasts, setToasts] = useState<{ id: string; type: ToastType; message: string }[]>([]);
+  const [showSessionControl, setShowSessionControl] = useState(false);
+  const [sessionConfig, setSessionConfig] = useState<any>(null);
+  const [sessionRoomId, setSessionRoomId] = useState<string>('');
+  const [sessionDuration, setSessionDuration] = useState<number>(60);
 
-  const generateDefaultTemplate = (roomId: string): PKConfig => ({
-    roomId,
-    teams: [
-      {
-        teamId: 'team-1',
-        name: 'Team A',
-        bindingGift: 'Rose',
-        streamers: [
-          {
-            streamerId: 'streamer-1',
-            bigoId: '',
-            bigoRoomId: '',
-            name: 'Streamer 1',
-            bindingGift: 'Rose',
-          },
-        ],
-      },
-      {
-        teamId: 'team-2',
-        name: 'Team B',
-        bindingGift: 'Diamond',
-        streamers: [
-          {
-            streamerId: 'streamer-2',
-            bigoId: '',
-            bigoRoomId: '',
-            name: 'Streamer 2',
-            bindingGift: 'Diamond',
-          },
-        ],
-      },
-    ],
-  });
+  // Toast helper
+  const addToast = (type: ToastType, message: string, persistent = false) => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setToasts(prev => [...prev, { id, type, message }]);
 
-  const handleLoadConfig = async () => {
-    if (!roomId.trim()) {
-      alert('Please enter a Room ID');
-      return;
-    }
-
-    try {
-      const bbCoreUrl = await GetBBCoreURL();
-      await InitializeBBCoreClient(bbCoreUrl, accessToken);
-
-      try {
-        const fetchedConfig = await GetBBAppConfig(roomId);
-        setConfig(fetchedConfig as PKConfig);
-        setConfigLoaded(true);
-      } catch (error: any) {
-        if (error.toString().includes('404')) {
-          // Room not found, load default template
-          const defaultConfig = generateDefaultTemplate(roomId);
-          setConfig(defaultConfig);
-          setConfigLoaded(true);
-          alert('Room not found. Loaded default template.');
-        } else {
-          throw error;
-        }
-      }
-    } catch (error: any) {
-      alert(`Failed to load config: ${error.toString()}`);
+    if (!persistent) {
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+      }, 3000);
     }
   };
 
-  const validateConfig = (): string | null => {
-    if (!config) return 'No configuration loaded';
-    if (!config.roomId.trim()) return 'Room ID is required';
-    if (config.teams.length === 0) return 'At least one team is required';
-
-    for (const team of config.teams) {
-      if (!team.name.trim()) return 'All teams must have a name';
-      if (!team.bindingGift.trim()) return 'All teams must have a binding gift';
-      if (team.streamers.length === 0) return 'Each team must have at least one streamer';
-
-      for (const streamer of team.streamers) {
-        if (!streamer.name.trim()) return 'All streamers must have a name';
-        if (!streamer.bigoRoomId.trim()) return 'All streamers must have a Bigo Room ID';
-        if (!streamer.bindingGift.trim()) return 'All streamers must have a binding gift';
-      }
-    }
-
-    return null; // Valid
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const handleSaveConfig = async () => {
-    if (!config) {
-      alert('No configuration to save');
-      return;
-    }
-
-    // Validate configuration
-    const validationError = validateConfig();
-    if (validationError) {
-      alert(`Validation failed: ${validationError}`);
-      return;
-    }
-
-    setSaving(true);
-    try {
-      // Ensure proper structure for backend
-      const configToSave = api.Config.createFrom({
-        roomId: config.roomId,
-        agencyId: config.agencyId || 0,  // Default to 0 if undefined
-        session: {
-          sessionId: '',
-          startTime: 0,
-          status: '',
-        },
-        teams: config.teams,
-      });
-
-      console.log('Saving config:', JSON.stringify(configToSave, null, 2));
-
-      await SaveBBAppConfig(config.roomId, configToSave);
-      setConfigSaved(true);
-      alert('Configuration saved successfully!');
-    } catch (error: any) {
-      alert(`Failed to save configuration: ${error.toString()}`);
-    } finally {
-      setSaving(false);
-    }
+  const handleSessionStart = (roomId: string, config: any) => {
+    console.log('Session setup completed for room:', roomId);
+    setSessionConfig(config);
+    setSessionRoomId(roomId);
+    setSessionDuration(60); // Default 60 minutes
+    setShowSessionControl(true);
+    if (onSessionChange) onSessionChange(true);
   };
 
-  const handleStartSession = async () => {
-    if (!config || !configSaved) {
-      alert('Please save the configuration before starting a session');
-      return;
-    }
-
-    setStartingSession(true);
-    try {
-      const bbCoreUrl = await GetBBCoreURL();
-      // Convert local PKConfig to api.Config format expected by backend
-      // Note: Frontend uses custom PKConfig with Team[], backend expects api.Config
-      const apiConfig = new api.Config({
-        roomId: config.roomId,
-        agencyId: config.agencyId || 0,
-        session: new api.SessionInfo({
-          sessionId: '',
-          status: 'pending',
-          startedAt: 0,
-          endsAt: 0,
-          roomId: config.roomId,
-        }),
-        teams: config.teams.map(team => new api.Team({
-          teamId: team.teamId,
-          name: team.name,
-          bindingGift: team.bindingGift,
-          scoreMultipliers: team.scoreMultipliers || {},
-          streamers: [], // Streamers will be populated from config fetched by backend
-        })),
-      });
-      await StartPKSession(bbCoreUrl, accessToken, config.roomId, apiConfig);
-
-      setSessionActive(true);
-      onSessionChange(true);
-
-      // Generate overlay URL
-      const url = await GetOverlayURL('pk-battle', config.roomId, accessToken);
-      setOverlayUrl(url);
-
-      alert('PK Session started successfully!');
-    } catch (error: any) {
-      alert(`Failed to start session: ${error.toString()}`);
-    } finally {
-      setStartingSession(false);
-    }
-  };
-
-  const handleStopSession = async () => {
-    const confirmed = window.confirm('Are you sure you want to stop the session?');
-    if (!confirmed) return;
-
-    setStoppingSession(true);
-    try {
-      await StopPKSession('USER_STOPPED');
-
-      setSessionActive(false);
-      onSessionChange(false);
-      setOverlayUrl(''); // Clear overlay URL
-
-      alert('PK Session stopped successfully!');
-    } catch (error: any) {
-      alert(`Failed to stop session: ${error.toString()}`);
-    } finally {
-      setStoppingSession(false);
-    }
-  };
-
-  const handleAddTeam = () => {
-    if (!config) return;
-
-    const newTeamId = `team-${Date.now()}`;
-    const newTeam: Team = {
-      teamId: newTeamId,
-      name: `Team ${config.teams.length + 1}`,
-      bindingGift: 'Rose',
-      streamers: [
-        {
-          streamerId: `streamer-${Date.now()}`,
-          bigoId: '',
-          bigoRoomId: '',
-          name: 'Streamer 1',
-          bindingGift: 'Rose',
-        },
-      ],
-    };
-
-    setConfig({
-      ...config,
-      teams: [...config.teams, newTeam],
-    });
-    setConfigSaved(false);
-  };
-
-  const handleUpdateTeam = (teamIndex: number, updatedTeam: Team) => {
-    if (!config) return;
-
-    const updatedTeams = [...config.teams];
-    updatedTeams[teamIndex] = updatedTeam;
-    setConfig({
-      ...config,
-      teams: updatedTeams,
-    });
-    setConfigSaved(false);
-  };
-
-  const handleRemoveTeam = (teamIndex: number) => {
-    if (!config) return;
-
-    if (config.teams.length <= 1) {
-      alert('Cannot remove the last team. At least one team is required.');
-      return;
-    }
-
-    const updatedTeams = config.teams.filter((_, index) => index !== teamIndex);
-    setConfig({
-      ...config,
-      teams: updatedTeams,
-    });
-    setConfigSaved(false);
-  };
-
-  const handleCopyUrl = () => {
-    navigator.clipboard.writeText(overlayUrl).then(() => {
-      alert('Overlay URL copied to clipboard!');
-    }).catch((err) => {
-      alert('Failed to copy URL: ' + err.toString());
-    });
+  const handleBackToSetup = () => {
+    setShowSessionControl(false);
+    setSessionConfig(null);
+    setSessionRoomId('');
+    if (onSessionChange) onSessionChange(false);
   };
 
   return (
-    <div className="pk-mode-scene">
-      <div className="card">
-        <h2>Load Room Configuration</h2>
-        <input
-          type="text"
-          placeholder="Room ID"
-          value={roomId}
-          onChange={(e) => setRoomId(e.target.value)}
-          disabled={configLoaded || sessionActive}
-        />
-        <button onClick={handleLoadConfig} disabled={configLoaded || sessionActive}>
-          Load Configuration
-        </button>
+    <div className="pk-mode-scene h-full flex flex-col">
+      <div className="flex-1 relative overflow-auto">
+        {!showSessionControl ? (
+          <WizardContainer
+            onSessionStart={handleSessionStart}
+            accessToken={accessToken}
+          />
+        ) : (
+          <SessionControlPanel
+            config={sessionConfig}
+            roomId={sessionRoomId}
+            durationMinutes={sessionDuration}
+            onBack={handleBackToSetup}
+            onSessionActiveChange={onSessionChange}
+          />
+        )}
       </div>
 
-      {configLoaded && config && (
-        <div className="card">
-          <div className="teams-header">
-            <h2>Teams Configuration</h2>
-            <button className="add-team-btn" onClick={handleAddTeam}>
-              <Plus size={16} /> Add Team
-            </button>
-          </div>
-
-          <div className="teams-list">
-            {config.teams.map((team, index) => (
-              <TeamCard
-                key={team.teamId}
-                team={team}
-                onUpdateTeam={(updatedTeam) => handleUpdateTeam(index, updatedTeam)}
-                onRemoveTeam={() => handleRemoveTeam(index)}
-                canRemove={config.teams.length > 1}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {sessionActive && overlayUrl && (
-        <div className="card overlay-url-card">
-          <h2>Overlay URL</h2>
-          <p className="overlay-instructions">
-            Copy this URL and add it as a Browser Source in OBS:
-          </p>
-          <div className="overlay-url-container">
-            <input
-              type="text"
-              className="overlay-url-input"
-              value={overlayUrl}
-              readOnly
-            />
-            <button className="copy-url-btn" onClick={handleCopyUrl}>
-              Copy URL
-            </button>
-          </div>
-          <p className="overlay-note">
-            <strong>Note:</strong> The overlay will connect to BB-Core and display real-time PK battle data.
-          </p>
-        </div>
-      )}
-
-      {configLoaded && config && (
-        <div className="card">
-          <div className="action-buttons">
-            <button
-              className="save-config-btn"
-              onClick={handleSaveConfig}
-              disabled={saving || configSaved || sessionActive}
-            >
-              {saving ? 'Saving...' : configSaved ? 'Configuration Saved ✓' : 'Save Configuration'}
-            </button>
-
-            {!sessionActive ? (
-              <button
-                className="start-session-btn"
-                onClick={handleStartSession}
-                disabled={!configSaved || startingSession}
-              >
-                {startingSession ? 'Starting Session...' : 'Start Session'}
-              </button>
-            ) : (
-              <button
-                className="stop-session-btn"
-                onClick={handleStopSession}
-                disabled={stoppingSession}
-              >
-                {stoppingSession ? 'Stopping Session...' : 'Stop Session'}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      <div className="fixed bottom-4 right-4 z-50">
+        <ToastNotification
+          toasts={toasts}
+          onDismiss={removeToast}
+        />
+      </div>
     </div>
   );
-};
+}

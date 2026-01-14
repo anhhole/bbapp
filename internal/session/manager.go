@@ -3,213 +3,214 @@ package session
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"bbapp/internal/api"
+	"bbapp/internal/browser"
 	"bbapp/internal/config"
-	"bbapp/internal/stomp"
 )
 
 type Manager struct {
-	apiClient   *api.Client
-	stompClient *stomp.Client
-	config      *config.Manager
-	heartbeat   *Heartbeat
-	sessionId   string
-	roomId      string
-	deviceHash  string
-	isActive    bool
-	connections map[string]*api.ConnectionStatus
-	mutex       sync.RWMutex
+	apiClient      *api.Client
+	deviceHash     string
+	browserManager *browser.Manager
+	bigoListener   *BigoListenerSession
+	bbcoreStream   *BBCoreStreamSession
+	config         *config.Manager
+	mutex          sync.RWMutex
 }
 
 func NewManager() *Manager {
+	browserMgr := browser.NewManager()
 	return &Manager{
-		connections: make(map[string]*api.ConnectionStatus),
-		isActive:    false,
+		browserManager: browserMgr,
+		bigoListener:   NewBigoListenerSession(browserMgr),
 	}
 }
 
 func (m *Manager) Initialize(apiClient *api.Client, deviceHash string) {
 	m.apiClient = apiClient
 	m.deviceHash = deviceHash
+	m.bbcoreStream = NewBBCoreStreamSession(apiClient, deviceHash)
 }
 
-// Start starts a new PK session with trial validation and STOMP connection
-func (m *Manager) Start(roomId string, cfg *api.Config, bbCoreURL, accessToken string) error {
+// StartBigoListener starts only the Bigo listener session
+func (m *Manager) StartBigoListener(cfg *api.Config) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	if m.isActive {
-		return fmt.Errorf("session already active")
-	}
+	fmt.Printf("[Manager] Starting Bigo listener (current state: active=%v)\n", m.bigoListener.IsActive())
 
-	// Step 1: Validate trial (final check before session start)
-	fmt.Println("[Session] Step 1: Validating streamers for trial...")
-	streamers := make([]api.ValidateTrialStreamer, 0)
-	for _, team := range cfg.Teams {
-		for _, s := range team.Streamers {
-			streamers = append(streamers, api.ValidateTrialStreamer{
-				BigoId:     s.BigoId,
-				BigoRoomId: s.BigoRoomId,
-			})
-		}
-	}
-
-	validationResp, err := m.apiClient.ValidateTrial(streamers)
-	if err != nil {
-		return fmt.Errorf("trial validation failed: %w", err)
-	}
-
-	if !validationResp.Allowed {
-		return fmt.Errorf("trial validation rejected: %s (blocked IDs: %v)",
-			validationResp.Message, validationResp.BlockedBigoIds)
-	}
-
-	fmt.Printf("[Session] ✓ Trial validation passed\n")
-
-	// Step 2: Start session at BB-Core
-	fmt.Println("[Session] Step 2: Starting session at BB-Core...")
-	resp, err := m.apiClient.StartSession(roomId, m.deviceHash)
-	if err != nil {
-		return fmt.Errorf("start session API call failed: %w", err)
-	}
-
-	if !resp.Success {
-		return fmt.Errorf("session start failed: %s", resp.Message)
-	}
-
-	m.sessionId = resp.SessionId
-	m.roomId = roomId
 	m.config = config.NewManager(cfg)
-
-	fmt.Printf("[Session] ✓ Session started at BB-Core: %s\n", m.sessionId)
-
-	// Step 3: Establish STOMP connection
-	fmt.Println("[Session] Step 3: Establishing STOMP connection...")
-	stompClient, err := stomp.NewClient(bbCoreURL, accessToken, "")
+	err := m.bigoListener.Start(cfg)
 	if err != nil {
-		// Rollback: stop session at BB-Core
-		m.apiClient.StopSession(roomId, "STOMP_CONNECTION_FAILED")
-		return fmt.Errorf("STOMP connection failed: %w", err)
+		fmt.Printf("[Manager] ERROR starting Bigo listener: %v\n", err)
+		return err
 	}
-
-	m.stompClient = stompClient
-	fmt.Printf("[Session] ✓ STOMP connected successfully\n")
-
-	// Step 4: Start heartbeat service
-	fmt.Println("[Session] Step 4: Starting heartbeat service...")
-	m.heartbeat = NewHeartbeat(m, m.apiClient, roomId, 30*time.Second)
-	m.heartbeat.Start()
-	fmt.Printf("[Session] ✓ Heartbeat service started (30s interval)\n")
-
-	m.isActive = true
-
-	fmt.Printf("[Session] ✓✓✓ Session fully started: %s\n", m.sessionId)
+	fmt.Println("[Manager] ✓ Bigo listener started successfully")
 	return nil
 }
 
-// Stop stops the PK session and cleans up all resources
+// StopBigoListener stops only the Bigo listener session
+func (m *Manager) StopBigoListener() error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	return m.bigoListener.Stop()
+}
+
+// StartBBCoreStream starts only the BB-Core streaming session
+// Auto-starts Bigo listener if not already active (per user preference)
+func (m *Manager) StartBBCoreStream(roomId string, cfg *api.Config, bbCoreURL, accessToken string, durationMinutes int) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// Auto-start Bigo listener if not active
+	if !m.bigoListener.IsActive() {
+		fmt.Println("[Manager] Auto-starting Bigo listener before BB-Core stream...")
+		m.config = config.NewManager(cfg)
+		if err := m.bigoListener.Start(cfg); err != nil {
+			return fmt.Errorf("failed to auto-start Bigo listener: %w", err)
+		}
+		fmt.Println("[Manager] ✓ Bigo listener auto-started")
+	}
+
+	return m.bbcoreStream.Start(roomId, cfg, m.bigoListener, bbCoreURL, accessToken, durationMinutes)
+}
+
+// StopBBCoreStream stops only the BB-Core streaming session
+// Keeps Bigo listener running (continues buffering events)
+func (m *Manager) StopBBCoreStream(reason string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	return m.bbcoreStream.Stop(reason)
+}
+
+// Start starts both sessions (convenience method for backward compatibility)
+func (m *Manager) Start(roomId string, cfg *api.Config, bbCoreURL, accessToken string, durationMinutes int) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	fmt.Println("[Manager] Starting both Bigo listener and BB-Core stream sessions...")
+
+	// Start Bigo listener first
+	m.config = config.NewManager(cfg)
+	if err := m.bigoListener.Start(cfg); err != nil {
+		return fmt.Errorf("failed to start Bigo listener: %w", err)
+	}
+
+	// Then start BB-Core stream
+	if err := m.bbcoreStream.Start(roomId, cfg, m.bigoListener, bbCoreURL, accessToken, durationMinutes); err != nil {
+		// Rollback: stop Bigo listener
+		m.bigoListener.Stop()
+		return fmt.Errorf("failed to start BB-Core stream: %w", err)
+	}
+
+	fmt.Println("[Manager] ✓✓✓ Both sessions started successfully")
+	return nil
+}
+
+// Stop stops both sessions (convenience method for backward compatibility)
 func (m *Manager) Stop(reason string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	if !m.isActive {
-		return fmt.Errorf("session not active")
+	fmt.Printf("[Manager] Stopping both sessions (reason: %s)...\n", reason)
+
+	var streamErr, listenerErr error
+
+	// Stop BB-Core stream first
+	if m.bbcoreStream.IsActive() {
+		streamErr = m.bbcoreStream.Stop(reason)
 	}
 
-	fmt.Printf("[Session] Stopping session (reason: %s)...\n", reason)
-
-	// Step 1: Stop heartbeat service
-	if m.heartbeat != nil {
-		fmt.Println("[Session] Step 1: Stopping heartbeat service...")
-		m.heartbeat.Stop()
-		m.heartbeat = nil
-		fmt.Println("[Session] ✓ Heartbeat stopped")
+	// Then stop Bigo listener
+	if m.bigoListener.IsActive() {
+		listenerErr = m.bigoListener.Stop()
 	}
 
-	// Step 2: Disconnect STOMP
-	if m.stompClient != nil {
-		fmt.Println("[Session] Step 2: Disconnecting STOMP...")
-		m.stompClient.Disconnect()
-		m.stompClient = nil
-		fmt.Println("[Session] ✓ STOMP disconnected")
+	if streamErr != nil {
+		return fmt.Errorf("failed to stop BB-Core stream: %w", streamErr)
+	}
+	if listenerErr != nil {
+		return fmt.Errorf("failed to stop Bigo listener: %w", listenerErr)
 	}
 
-	// Step 3: Notify BB-Core that session is stopping
-	fmt.Println("[Session] Step 3: Notifying BB-Core...")
-	resp, err := m.apiClient.StopSession(m.roomId, reason)
-	if err != nil {
-		// Log error but don't fail - session should still stop locally
-		fmt.Printf("[Session] WARNING: Failed to notify BB-Core: %v\n", err)
-	} else if !resp.Success {
-		fmt.Printf("[Session] WARNING: BB-Core stop failed: %s\n", resp.Message)
-	} else {
-		fmt.Println("[Session] ✓ BB-Core notified")
-	}
-
-	// Step 4: Clean up local state
-	m.isActive = false
-	m.connections = make(map[string]*api.ConnectionStatus)
-	m.sessionId = ""
-	m.roomId = ""
-
-	fmt.Printf("[Session] ✓✓✓ Session stopped successfully\n")
+	fmt.Println("[Manager] ✓✓✓ Both sessions stopped successfully")
 	return nil
 }
 
-func (m *Manager) UpdateConnectionStatus(bigoRoomId, status, errorMsg string, msgCount int64) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	streamer, err := m.config.LookupStreamerByBigoRoom(bigoRoomId)
-	if err != nil {
-		fmt.Printf("[Session] WARNING: Unknown bigo room %s\n", bigoRoomId)
-		return
-	}
-
-	conn := &api.ConnectionStatus{
-		BigoId:           streamer.BigoId,
-		BigoRoomId:       bigoRoomId,
-		Status:           status,
-		MessagesReceived: msgCount,
-		LastMessageAt:    time.Now().UnixMilli(),
-		Error:            errorMsg,
-	}
-
-	m.connections[bigoRoomId] = conn
+// GetBigoListenerStatus returns the status of the Bigo listener session
+func (m *Manager) GetBigoListenerStatus() BigoListenerStatus {
+	return m.bigoListener.GetStatus()
 }
 
+// GetBBCoreStreamStatus returns the status of the BB-Core stream session
+func (m *Manager) GetBBCoreStreamStatus() BBCoreStreamStatus {
+	return m.bbcoreStream.GetStatus()
+}
+
+// GetStatus returns the combined status (for backward compatibility)
 func (m *Manager) GetStatus() Status {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	connList := make([]api.ConnectionStatus, 0, len(m.connections))
-	for _, conn := range m.connections {
-		connList = append(connList, *conn)
+	bigoStatus := m.bigoListener.GetStatus()
+	streamStatus := m.bbcoreStream.GetStatus()
+
+	// Convert BigoConnection to api.ConnectionStatus for backward compatibility
+	connections := make([]api.ConnectionStatus, len(bigoStatus.Connections))
+	for i, conn := range bigoStatus.Connections {
+		connections[i] = api.ConnectionStatus{
+			BigoId:           conn.BigoId,
+			BigoRoomId:       conn.BigoRoomId,
+			Status:           conn.Status,
+			MessagesReceived: conn.MessagesReceived,
+			LastMessageAt:    conn.LastMessageAt.UnixMilli(),
+			Error:            conn.Error,
+		}
 	}
 
 	return Status{
-		RoomId:      m.roomId,
-		SessionId:   m.sessionId,
-		IsActive:    m.isActive,
-		Connections: connList,
+		RoomId:      streamStatus.RoomId,
+		SessionId:   streamStatus.SessionId,
+		IsActive:    bigoStatus.IsActive && streamStatus.IsActive,
+		Connections: connections,
 		DeviceHash:  m.deviceHash,
 	}
 }
 
+// GetConfig returns the config manager
 func (m *Manager) GetConfig() *config.Manager {
 	return m.config
 }
 
-// GetStompClient returns the STOMP client for publishing messages
-func (m *Manager) GetStompClient() *stomp.Client {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-	return m.stompClient
+// GetStompClient returns the STOMP client from BB-Core stream session
+func (m *Manager) GetStompClient() interface{} {
+	if m.bbcoreStream == nil {
+		return nil
+	}
+	return m.bbcoreStream.GetStompClient()
 }
 
-// GetDeviceHash returns the device hash for including in messages
+// GetDeviceHash returns the device hash
 func (m *Manager) GetDeviceHash() string {
 	return m.deviceHash
+}
+
+// UpdateConnectionStatus updates the connection status in Bigo listener
+func (m *Manager) UpdateConnectionStatus(bigoRoomId, status, errorMsg string, msgCount int64) {
+	m.bigoListener.UpdateConnectionStatus(bigoRoomId, status, errorMsg, msgCount)
+}
+
+// SetGiftLibrary updates the gift library in the Bigo listener
+func (m *Manager) SetGiftLibrary(lib []api.GiftDefinition) {
+	m.bigoListener.SetGiftLibrary(lib)
+}
+
+// BufferEvent buffers an event in the Bigo listener session
+func (m *Manager) BufferEvent(event interface{}) {
+	// Type assertion would be needed here based on actual event type
+	// For now, this is a placeholder
+	// m.bigoListener.BufferEvent(event)
 }

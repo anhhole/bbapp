@@ -3,10 +3,23 @@ package api
 import "time"
 
 type Config struct {
-	RoomId   string       `json:"roomId"`
-	AgencyId int          `json:"agencyId"`
-	Session  SessionInfo  `json:"session"`
-	Teams    []Team       `json:"teams"`
+	RoomId   string      `json:"roomId"`
+	AgencyId int         `json:"agencyId"`
+	Session  SessionInfo `json:"session"`
+	Teams    []Team      `json:"teams"`
+}
+
+type SaveConfigRequest struct {
+	RoomId      string `json:"roomId"`
+	ConfigData  Config `json:"configData"`
+	Description string `json:"description"`
+	IsActive    bool   `json:"isActive"`
+}
+
+type GlobalIdol struct {
+	Name       string `json:"name"`
+	BigoRoomId string `json:"bigoRoomId"`
+	Avatar     string `json:"avatar"`
 }
 
 type SessionInfo struct {
@@ -16,39 +29,54 @@ type SessionInfo struct {
 }
 
 type Team struct {
-	TeamId           string            `json:"teamId"`
-	Name             string            `json:"name"`
-	BindingGift      string            `json:"bindingGift"`
-	ScoreMultipliers map[string]int64  `json:"scoreMultipliers"`
-	Streamers        []Streamer        `json:"streamers"`
+	TeamId           string           `json:"teamId"`
+	Name             string           `json:"name"`
+	Avatar           string           `json:"avatar"`
+	BindingGift      string           `json:"bindingGift"`
+	ScoreMultipliers map[string]int64 `json:"scoreMultipliers"`
+	Streamers        []Streamer       `json:"streamers"`
 }
 
 type Streamer struct {
-	StreamerId   string `json:"streamerId"`
-	BigoId       string `json:"bigoId"`
-	BigoRoomId   string `json:"bigoRoomId"`
-	Name         string `json:"name"`
-	Avatar       string `json:"avatar"`
-	BindingGift  string `json:"bindingGift"`
+	StreamerId  string `json:"id"`
+	BigoId      string `json:"bigoId"`
+	BigoRoomId  string `json:"bigoRoomId"`
+	Name        string `json:"name"`
+	Avatar      string `json:"avatar"`
+	BindingGift string `json:"bindingGift"`
 }
 
-type StartSessionRequest struct {
-	DeviceHash string `json:"deviceHash"`
+// Script Management Types (New /api/v1/scripts endpoints)
+
+type StartScriptRequest struct {
+	RoomId          string                 `json:"roomId"`
+	ScriptType      string                 `json:"scriptType"` // "PK", "CHAMP", "CHAT_RANKING"
+	DurationMinutes int                    `json:"durationMinutes"`
+	ScriptPayload   map[string]interface{} `json:"scriptPayload,omitempty"`
 }
 
-type StartSessionResponse struct {
+type StartScriptResponse struct {
+	SessionId       string `json:"sessionId"`
+	RoomId          string `json:"roomId"`
+	ScriptType      string `json:"scriptType"`
+	Status          string `json:"status"`
+	StartedAt       int64  `json:"startedAt"`
+	EndsAt          int64  `json:"endsAt"`
+	DurationMinutes int    `json:"durationMinutes"`
+}
+
+type StopScriptRequest struct {
 	SessionId string `json:"sessionId"`
-	Success   bool   `json:"success"`
-	Message   string `json:"message"`
 }
 
-type StopSessionRequest struct {
-	Reason string `json:"reason"`
-}
-
-type StopSessionResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+type StopScriptResponse struct {
+	SessionId  string                 `json:"sessionId"`
+	RoomId     string                 `json:"roomId"`
+	ScriptType string                 `json:"scriptType"`
+	Status     string                 `json:"status"`
+	StartedAt  int64                  `json:"startedAt"`
+	EndedAt    int64                  `json:"endedAt"`
+	FinalData  map[string]interface{} `json:"finalData,omitempty"`
 }
 
 type HeartbeatRequest struct {
@@ -118,6 +146,7 @@ type Agency struct {
 	CurrentRooms int       `json:"currentRooms"`
 	ExpiresAt    time.Time `json:"expiresAt"`
 }
+
 // ValidateTrial Types
 
 // ValidateTrialStreamer represents a streamer to validate
@@ -128,7 +157,7 @@ type ValidateTrialStreamer struct {
 
 // ValidateTrialRequest is the request body for trial validation
 type ValidateTrialRequest struct {
-	Streamers []ValidateTrialStreamer `json:"streamers"`
+	Streamers []ValidateTrialStreamer `json:"idols"` // JSON uses "idols" for frontend compatibility
 }
 
 // ValidateTrialResponse is the response from trial validation
@@ -137,4 +166,12 @@ type ValidateTrialResponse struct {
 	Message        string   `json:"message"`
 	BlockedBigoIds []string `json:"blockedBigoIds"`
 	Reason         string   `json:"reason,omitempty"`
+}
+
+// GiftDefinition represents a gift in the library
+type GiftDefinition struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Diamonds int    `json:"diamonds"`
+	Image    string `json:"image"`
 }
