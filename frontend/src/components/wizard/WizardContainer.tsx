@@ -58,11 +58,22 @@ export function WizardContainer({ accessToken, onSessionStart, roomId: initialRo
           // Ensure we have a valid config to save
           if (state.config) {
             await SaveBBAppConfig(state.roomId, state.config);
-            // The hook is defined above.
+
+            // Re-fetch config to get authoritative IDs (e.g. if Backend generated new Team IDs)
+            // This ensures Frontend and Backend are in sync
+            try {
+              const { FetchConfig } = await import('../../../wailsjs/go/main/App');
+              const syncedConfig = await FetchConfig(state.roomId);
+              if (syncedConfig) {
+                console.log("Synced config from backend:", syncedConfig);
+                setState((prev) => ({ ...prev, config: syncedConfig }));
+              }
+            } catch (fetchErr) {
+              console.warn("Failed to re-fetch synced config", fetchErr);
+            }
           }
         } catch (e: any) {
           console.error("Save failed", e);
-          // We access to 'addToast' here? Yes, it's in scope.
           addToast('error', `Failed to save configuration: ${e.toString()}`);
           return; // Stop navigation
         }

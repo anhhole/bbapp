@@ -108,6 +108,22 @@ export namespace api {
 		    return a;
 		}
 	}
+	export class OverlaySettings {
+	    showStreamerAvatar: boolean;
+	    showWinStreak: boolean;
+	    timerDuration: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new OverlaySettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.showStreamerAvatar = source["showStreamerAvatar"];
+	        this.showWinStreak = source["showWinStreak"];
+	        this.timerDuration = source["timerDuration"];
+	    }
+	}
 	export class Streamer {
 	    id: string;
 	    bigoId: string;
@@ -135,6 +151,7 @@ export namespace api {
 	    name: string;
 	    avatar: string;
 	    bindingGift: string;
+	    bindingGiftImage: string;
 	    scoreMultipliers: Record<string, number>;
 	    streamers: Streamer[];
 	
@@ -148,6 +165,7 @@ export namespace api {
 	        this.name = source["name"];
 	        this.avatar = source["avatar"];
 	        this.bindingGift = source["bindingGift"];
+	        this.bindingGiftImage = source["bindingGiftImage"];
 	        this.scoreMultipliers = source["scoreMultipliers"];
 	        this.streamers = this.convertValues(source["streamers"], Streamer);
 	    }
@@ -174,6 +192,10 @@ export namespace api {
 	    sessionId: string;
 	    startTime: number;
 	    status: string;
+	    durationMinutes: number;
+	    pausedAt: number;
+	    resumedAt: number;
+	    scriptData: Record<string, any>;
 	
 	    static createFrom(source: any = {}) {
 	        return new SessionInfo(source);
@@ -184,6 +206,10 @@ export namespace api {
 	        this.sessionId = source["sessionId"];
 	        this.startTime = source["startTime"];
 	        this.status = source["status"];
+	        this.durationMinutes = source["durationMinutes"];
+	        this.pausedAt = source["pausedAt"];
+	        this.resumedAt = source["resumedAt"];
+	        this.scriptData = source["scriptData"];
 	    }
 	}
 	export class Config {
@@ -191,6 +217,7 @@ export namespace api {
 	    agencyId: number;
 	    session: SessionInfo;
 	    teams: Team[];
+	    overlaySettings: OverlaySettings;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -202,6 +229,7 @@ export namespace api {
 	        this.agencyId = source["agencyId"];
 	        this.session = this.convertValues(source["session"], SessionInfo);
 	        this.teams = this.convertValues(source["teams"], Team);
+	        this.overlaySettings = this.convertValues(source["overlaySettings"], OverlaySettings);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -282,6 +310,7 @@ export namespace api {
 	
 	
 	
+	
 	export class ValidateTrialResponse {
 	    allowed: boolean;
 	    message: string;
@@ -335,6 +364,7 @@ export namespace listener {
 	    Timestamp: number;
 	    BigoRoomId: string;
 	    RoomTotalDiamonds: number;
+	    TeamId: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new BigoGift(source);
@@ -357,6 +387,7 @@ export namespace listener {
 	        this.Timestamp = source["Timestamp"];
 	        this.BigoRoomId = source["BigoRoomId"];
 	        this.RoomTotalDiamonds = source["RoomTotalDiamonds"];
+	        this.TeamId = source["TeamId"];
 	    }
 	}
 	export class BigoUserInfo {

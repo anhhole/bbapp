@@ -562,7 +562,7 @@ export function RoomConfigStep({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="grid grid-cols-4 gap-4 text-center">
                 <div className="bg-background p-3 rounded-lg border">
                   <div className="text-2xl font-bold">{state.config.teams?.length || 0}</div>
                   <div className="text-xs text-muted-foreground uppercase">Teams</div>
@@ -572,6 +572,12 @@ export function RoomConfigStep({
                     {state.config.teams?.reduce((sum: number, team: any) => sum + (team.streamers?.length || 0), 0) || 0}
                   </div>
                   <div className="text-xs text-muted-foreground uppercase">Idols</div>
+                </div>
+                <div className="bg-background p-3 rounded-lg border">
+                  <div className="text-2xl font-bold">
+                    {(state.config.overlaySettings?.showTimer ?? true) ? "ON" : "OFF"}
+                  </div>
+                  <div className="text-xs text-muted-foreground uppercase">Timer</div>
                 </div>
                 <div className="bg-background p-3 rounded-lg border flex flex-col justify-center items-center">
                   <span className="text-xs text-muted-foreground">Auto-Next in</span>

@@ -40,6 +40,7 @@ type App struct {
 	apiClient      *api.Client
 	profileManager *profile.Manager
 	giftLibrary    []api.GiftDefinition
+	currentConfig  *api.Config // Cache for internal use
 }
 
 // NewApp creates new App
@@ -485,6 +486,84 @@ func (a *App) ensureSessionManager() error {
 	fmt.Printf("[App] Injecting Gift Library to safety session (Size: %d)\n", len(a.giftLibrary))
 	a.session.SetGiftLibrary(a.giftLibrary)
 
+	// Subscribe to internal listeners for SSE broadcasting
+	a.session.SubscribeOnGift(func(event interface{}) {
+		gift, ok := event.(listener.BigoGift)
+		if !ok {
+			return
+		}
+
+		// Log minimal
+		fmt.Printf("[App] Internal Gift Event: %s x%d (Room: %s)\n", gift.GiftName, gift.GiftCount, gift.BigoRoomId)
+
+		// Resolve TeamId using a.currentConfig (This ensures consistency with Overlay)
+		var teamId string
+		a.mutex.RLock()
+		if a.currentConfig != nil {
+			// 1. Check Binding Gifts first (Priority)
+			if gift.GiftName != "" {
+				for _, team := range a.currentConfig.Teams {
+					if strings.EqualFold(team.BindingGift, gift.GiftName) {
+						teamId = team.TeamId
+						// fmt.Printf("[App] Resolved Team via Binding Gift: %s -> %s\n", gift.GiftName, team.TeamId)
+						break
+					}
+				}
+			}
+
+			// 2. Check Streamers if not found
+			if teamId == "" {
+				for _, team := range a.currentConfig.Teams {
+					for _, s := range team.Streamers {
+						// Check BigoRoomId (numeric) or BigoId (username/id)
+						if (s.BigoRoomId != "" && s.BigoRoomId == gift.BigoRoomId) ||
+							(s.BigoId != "" && strings.EqualFold(s.BigoId, gift.BigoRoomId)) {
+							teamId = team.TeamId
+							break
+						}
+					}
+					if teamId != "" {
+						break
+					}
+				}
+			}
+		}
+		a.mutex.RUnlock()
+
+		if teamId != "" {
+			fmt.Printf("[App] SSE Broadcast: Resolved %s -> %s\n", gift.BigoRoomId, teamId)
+		} else {
+			// Debug: why missing?
+			fmt.Printf("[App] SSE Broadcast WARNING: No TeamID for %s\n", gift.BigoRoomId)
+		}
+
+		// Construct payload for Overlay
+		// Using map to be flexible and match JS expectations
+		payload := map[string]interface{}{
+			"type":           "GIFT",
+			"roomId":         "INTERNAL", // Or get from session status if needed
+			"teamId":         teamId,     // CRITICAL: Inject Resolved ID
+			"bigoRoomId":     gift.BigoRoomId,
+			"senderId":       gift.SenderId,
+			"senderName":     gift.SenderName,
+			"senderAvatar":   gift.SenderAvatar,
+			"senderLevel":    gift.SenderLevel,
+			"streamerId":     gift.StreamerId,
+			"streamerName":   gift.StreamerName,
+			"streamerAvatar": gift.StreamerAvatar,
+			"giftId":         gift.GiftId,
+			"giftName":       gift.GiftName,
+			"giftCount":      gift.GiftCount,
+			"diamonds":       gift.Diamonds,
+			"giftImageUrl":   gift.GiftImageUrl,
+			"timestamp":      gift.Timestamp,
+		}
+
+		if a.overlayServer != nil {
+			a.overlayServer.BroadcastEvent(payload)
+		}
+	})
+
 	fmt.Printf("[App] Session manager safety initialized\n")
 	return nil
 }
@@ -623,6 +702,17 @@ func (a *App) addBigoListenerForSession(bigoRoomId, roomId string) error {
 
 			destination := "/app/room/" + a.session.GetStatus().RoomId + "/bigo"
 			a.stompClient.Publish(destination, payload)
+
+			// Broadcast directly to overlay via SSE (Local, Robust)
+			// This bypasses STOMP broker issues completely
+			if a.overlayServer != nil {
+				fmt.Printf("[App] Broadcasting GIFT event via SSE. Payload type: %v\n", payload["type"])
+				// We attach the teamId if possible, but the overlay can resolve it.
+				// For consistency with STOMP, we send the same payload.
+				a.overlayServer.BroadcastEvent(payload)
+			} else {
+				fmt.Printf("[App] WARNING: OverlayServer is nil, cannot broadcast SSE event\n")
+			}
 		}
 
 		// Update session connection status
@@ -700,26 +790,12 @@ func (a *App) InitializeBBCoreClient(bbCoreUrl, authToken string) error {
 	a.bbCoreURL = bbCoreUrl
 	fmt.Printf("[App] BB-Core API client initialized: %s\n", bbCoreUrl)
 
-	// Initialize session manager if not already set
-	if a.session == nil {
-		// Generate device hash if not yet set
-		if a.deviceHash == "" {
-			deviceHash, err := fingerprint.GenerateDeviceHash()
-			if err != nil {
-				fmt.Printf("[App] ERROR: Failed to generate device hash: %v\n", err)
-			} else {
-				a.deviceHash = deviceHash
-				fmt.Printf("[App] Device hash initialized: %s\n", a.deviceHash)
-			}
-		}
-
-		a.session = session.NewManager()
-		a.session.Initialize(a.apiClient, a.deviceHash)
-		// Inject Gift Library
-		fmt.Printf("[App] Injecting Gift Library in InitializeBBCoreClient (Size: %d)\n", len(a.giftLibrary))
-		a.session.SetGiftLibrary(a.giftLibrary)
-
-		fmt.Printf("[App] Session manager initialized\n")
+	// Initialize session manager if not already set by calling ensureSessionManager
+	// This ensures the global subscription to events is properly registered
+	if err := a.ensureSessionManager(); err != nil {
+		fmt.Printf("[App] ERROR: Failed to ensure session manager in InitializeBBCoreClient: %v\n", err)
+	} else {
+		fmt.Printf("[App] Session manager initialized via ensureSessionManager\n")
 	}
 
 	return nil
@@ -739,7 +815,20 @@ func (a *App) GetBBAppConfig(roomId string) (*api.Config, error) {
 		return nil, err
 	}
 
-	fmt.Printf("[App] ✓ Config fetched successfully for room: %s\n", roomId)
+	// Update local cache and overlay server with the authoritative config
+	a.mutex.Lock()
+	a.currentConfig = config
+	a.mutex.Unlock()
+
+	if a.overlayServer != nil {
+		fmt.Printf("[App] Syncing local overlay server with authoritative config\n")
+		a.overlayServer.SetConfig(config)
+
+		// Optional: Broadcast generic update if needed, but Wizard serves as main driver here
+		// a.overlayServer.BroadcastEvent(...)
+	}
+
+	fmt.Printf("[App] ✓ Config fetched and synced successfully for room: %s\n", roomId)
 	return config, nil
 }
 
@@ -748,7 +837,113 @@ func (a *App) SaveBBAppConfig(roomId string, config api.Config) error {
 	if a.apiClient == nil {
 		return fmt.Errorf("not connected to BB-Core")
 	}
-	return a.apiClient.SaveConfig(roomId, &config)
+
+	// Enrich config with Binding Gift Images from Library
+	if len(a.giftLibrary) > 0 {
+		for i, team := range config.Teams {
+			// Only populate if not already set or if we want to ensure it's correct
+			// Let's look up by name
+			if team.BindingGift != "" {
+				for _, gift := range a.giftLibrary {
+					if strings.EqualFold(gift.Name, team.BindingGift) {
+						if gift.Image != "" {
+							config.Teams[i].BindingGiftImage = gift.Image
+							// fmt.Printf("[App] Populated BindingGiftImage for %s: %s\n", team.Name, gift.Image)
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if err := a.apiClient.SaveConfig(roomId, &config); err != nil {
+		return err
+	}
+
+	// CRITICAL: Refetch config from Core immediately to ensure we have the Authoritative IDs.
+	// The Core might have generated different IDs or modified the data.
+	// We must align with Core to avoid ID mismatches.
+	authoritativeConfig, err := a.GetBBAppConfig(roomId)
+	if err != nil {
+		fmt.Printf("[App] WARNING: Failed to refetch config after save: %v. Using local version (risk of desync).\n", err)
+	} else {
+		// Use the authoritative config
+		config = *authoritativeConfig
+		fmt.Printf("[App] ✓ Refetched authoritative config from Core. Teams: %d\n", len(config.Teams))
+	}
+
+	// Broadcast config update to overlay
+	if a.stompClient != nil {
+		fmt.Printf("[App] Broadcasting config update for room: %s\n", roomId)
+		fmt.Printf("[App] Overlay Settings: %+v\n", config.OverlaySettings)
+		// We send the full config object
+		// Note: We normally use /app/ prefix for client-to-server, but here we are acting as a client (the app)
+		// sending TO the broker. If the broker is simple relay, we might need to send to /topic/ directly
+		// or if we are using the BB-Core relay, we use the standard prefix.
+		// Assuming BB-Core relays /topic/ subscriptions.
+		// Let's rely on the direct topic broadcast if we have rights, or use a relay endpoint.
+		// Looking at other publishes: destination := "/app/room/" + roomId + "/bigo"
+		// This suggests we send to an application destination.
+		// Let's try sending to a config topic.
+
+		// If BB-Core doesn't have a specific handler for config updates, we might have to use a generic one
+		// or if we are just relaying to other clients (overlays).
+		// SAFEST BADGE: Use a known working channel or a new one if supported.
+		// Let's assume we can publish to /topic/room/{roomId}/config if the broker allows.
+		// If not, we might need a specific app endpoint.
+		// Based on `bigo` gift logic: a.stompClient.Publish("/app/room/" + roomId + "/bigo", payload)
+		// This implies there is a backend handler at @MessageMapping("/room/{roomId}/bigo").
+		// If we don't have a backend handler for config, we can't "Push" unless the broker blindly relays /topic/.
+		// Standard Spring Boot STOMP usually restricts /topic/ publish to server-side only unless configured otherwise.
+		// BUT, if `OverlayApp` subscribes to `/topic/...`, we need the server to send it there.
+
+		// Wait, if I cannot change the backend (Java/Spring?) code easily to add a handler,
+		// I am stuck with existing endpoints or Polling.
+		// The user said "no need to have auto update after 3s".
+		// IF I cannot rely on STOMP relay, I have to assume the backend has a general "broadcast" or "forward" capability.
+
+		// HYPOTHESIS: The backend likely has a generic relay or we can reuse `script` or `activity` channels?
+		// Better approach: Since I modified the backend for `gifts.json` (server.go), I cannot modify the JAVA backend of BB-Core.
+		// I am finding `SaveBBAppConfig` calls `a.apiClient.SaveConfig` (HTTP).
+		// The HTTP endpoint saves to DB. Does IT broadcast? If it did, `OverlayApp` would just need to listen.
+		// The fact it doesn't means it probably doesn't.
+
+		// WORKAROUND: Client-Side Broadcasting.
+		// The `OverlayApp` is a client. `SessionControlPanel` is a client (inside Wails).
+		// They share the same Wails `App` backend instance in `app.go`.
+		// But `OverlayApp` is running in a separate browser window (OBS).
+		// Wails `App` (Go) is the bridge.
+		// `OverlayApp` connects to STOMP (BB-Core). `App` (Go) connects to STOMP (BB-Core).
+		// Use `App` (Go) to send a message to STOMP that `OverlayApp` listens to.
+
+		// I will try publishing to `/app/room/{roomId}/broadcast` if it exists, or just try `/topic/room/{roomId}/config` directly.
+		// Many configs allow client publish to /topic. Let's try `/topic/room/{roomId}/config`.
+		destination := "/topic/room/" + roomId + "/config"
+		if err := a.stompClient.Publish(destination, config); err != nil {
+			fmt.Printf("[App] WARNING: Failed to broadcast config: %v\n", err)
+		}
+	}
+
+	// Update local cache
+	a.mutex.Lock()
+	a.currentConfig = &config
+	a.mutex.Unlock()
+
+	// Update local overlay server config (for visual settings persistence)
+	if a.overlayServer != nil {
+		fmt.Printf("[App] Updating local overlay server config\n")
+		a.overlayServer.SetConfig(&config)
+
+		// Broadcast update via SSE to ensure Overlay stays in sync (bypassing flaky STOMP)
+		fmt.Printf("[App] Broadcasting CONFIG_UPDATE via SSE\n")
+		a.overlayServer.BroadcastEvent(map[string]interface{}{
+			"type": "CONFIG_UPDATE",
+			"data": config,
+		})
+	}
+
+	return nil
 }
 
 // Profile Management Wails Bindings

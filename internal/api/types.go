@@ -3,10 +3,17 @@ package api
 import "time"
 
 type Config struct {
-	RoomId   string      `json:"roomId"`
-	AgencyId int         `json:"agencyId"`
-	Session  SessionInfo `json:"session"`
-	Teams    []Team      `json:"teams"`
+	RoomId          string          `json:"roomId"`
+	AgencyId        int             `json:"agencyId"`
+	Session         SessionInfo     `json:"session"`
+	Teams           []Team          `json:"teams"`
+	OverlaySettings OverlaySettings `json:"overlaySettings"`
+}
+
+type OverlaySettings struct {
+	ShowStreamerAvatar bool `json:"showStreamerAvatar"`
+	ShowWinStreak      bool `json:"showWinStreak"`
+	TimerDuration      int  `json:"timerDuration"` // in seconds, if using independent timer
 }
 
 type SaveConfigRequest struct {
@@ -23,9 +30,13 @@ type GlobalIdol struct {
 }
 
 type SessionInfo struct {
-	SessionId string `json:"sessionId"`
-	StartTime int64  `json:"startTime"`
-	Status    string `json:"status"`
+	SessionId       string                 `json:"sessionId"`
+	StartTime       int64                  `json:"startTime"`
+	Status          string                 `json:"status"`
+	DurationMinutes int                    `json:"durationMinutes"`
+	PausedAt        int64                  `json:"pausedAt"`
+	ResumedAt       int64                  `json:"resumedAt"`
+	ScriptData      map[string]interface{} `json:"scriptData"`
 }
 
 type Team struct {
@@ -33,6 +44,7 @@ type Team struct {
 	Name             string           `json:"name"`
 	Avatar           string           `json:"avatar"`
 	BindingGift      string           `json:"bindingGift"`
+	BindingGiftImage string           `json:"bindingGiftImage"`
 	ScoreMultipliers map[string]int64 `json:"scoreMultipliers"`
 	Streamers        []Streamer       `json:"streamers"`
 }

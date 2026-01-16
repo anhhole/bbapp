@@ -231,10 +231,10 @@ func (s *BBCoreStreamSession) publishEvent(event interface{}) error {
 	switch e := event.(type) {
 	case listener.BigoGift:
 		// Resolve Streamer ID first
-		resolvedStreamerId := s.resolveStreamerId(e.StreamerId, e.GiftName, e.SenderId)
+		resolvedStreamerId := s.resolveStreamerId(e.StreamerId, e.GiftName, e.GiftId, e.SenderId)
 		if resolvedStreamerId == "" {
-			fmt.Printf("[BBCoreStream] IGNORED gift '%s' from '%s' (SenderId: %s) - No binding or history match.\n",
-				e.GiftName, e.SenderName, e.SenderId)
+			fmt.Printf("[BBCoreStream] IGNORED gift '%s' (ID: %s) from '%s' (SenderId: %s) - No binding or history match.\n",
+				e.GiftName, e.GiftId, e.SenderName, e.SenderId)
 			return nil
 		}
 
@@ -393,16 +393,20 @@ func (s *BBCoreStreamSession) resolveTeamId(bigoRoomId string, giftName string) 
 }
 
 // resolveStreamerId finds the internal StreamerId using Binding Gift priority, then Sender History, then raw ID.
-func (s *BBCoreStreamSession) resolveStreamerId(bigoId string, giftName string, senderId string) string {
+func (s *BBCoreStreamSession) resolveStreamerId(bigoId string, giftName string, giftId string, senderId string) string {
 	if s.config == nil {
 		return bigoId
 	}
 
 	// 1. Check Streamer Binding Gifts first (Highest Priority)
-	if giftName != "" {
+	if giftName != "" || giftId != "" {
 		for _, team := range s.config.Teams {
 			for _, streamer := range team.Streamers {
-				if strings.EqualFold(streamer.BindingGift, giftName) {
+				// Check matches against GiftName OR GiftId
+				matchesName := giftName != "" && strings.EqualFold(streamer.BindingGift, giftName)
+				matchesId := giftId != "" && strings.EqualFold(streamer.BindingGift, giftId)
+
+				if matchesName || matchesId {
 					// MATCH FOUND!
 					targetId := streamer.BigoId
 					if targetId == "" {
@@ -426,6 +430,42 @@ func (s *BBCoreStreamSession) resolveStreamerId(bigoId string, giftName string, 
 		}
 	}
 
+	// 1.5 Check Team Binding Gifts (Secondary Priority)
+	// If the gift binds to a TEAM, we need to attribute it to a streamer in that team.
+	if giftName != "" || giftId != "" {
+		for _, team := range s.config.Teams {
+			matchesName := giftName != "" && strings.EqualFold(team.BindingGift, giftName)
+			matchesId := giftId != "" && strings.EqualFold(team.BindingGift, giftId)
+
+			if matchesName || matchesId {
+				// Team Match Found!
+				// Try to find a specific streamer in this team that matches the recipient
+				for _, streamer := range team.Streamers {
+					if (streamer.BigoId != "" && strings.EqualFold(streamer.BigoId, bigoId)) ||
+						(streamer.BigoRoomId != "" && strings.EqualFold(streamer.BigoRoomId, bigoId)) {
+
+						targetId := streamer.BigoId
+						if targetId == "" {
+							targetId = streamer.StreamerId
+						}
+						fmt.Printf("[BBCoreStream] Resolved gift '%s' via TEAM binding (Team: %s) -> Explicit Streamer Match: %s\n", giftName, team.Name, streamer.Name)
+						return targetId
+					}
+				}
+
+				// If no precise match, attribute to the first streamer in the team
+				if len(team.Streamers) > 0 {
+					targetId := team.Streamers[0].BigoId
+					if targetId == "" {
+						targetId = team.Streamers[0].StreamerId
+					}
+					fmt.Printf("[BBCoreStream] Resolved gift '%s' via TEAM binding (Team: %s) -> Default Streamer: %s\n", giftName, team.Name, team.Streamers[0].Name)
+					return targetId
+				}
+			}
+		}
+	}
+
 	// 2. Check Sender History Cache (If no direct binding match)
 	if senderId != "" {
 		s.bindingsMutex.Lock()
@@ -443,7 +483,38 @@ func (s *BBCoreStreamSession) resolveStreamerId(bigoId string, giftName string, 
 		}
 	}
 
-	// 3. Fallback: Return empty string to IGNORE unbound gifts (Strict Mode)
-	// User Requirement: "no using the raw id if not have binding gift and history ingore that gift"
+	// 3. Check Direct Streamer Match (Fallback)
+	// If the gift wasn't a binding gift, but it was sent to a known streamer, attribute it to them.
+	if bigoId != "" {
+		for _, team := range s.config.Teams {
+			for _, streamer := range team.Streamers {
+				// Check against both BigoId (user ID) and BigoRoomId (room ID)
+				if (streamer.BigoId != "" && strings.EqualFold(streamer.BigoId, bigoId)) ||
+					(streamer.BigoRoomId != "" && strings.EqualFold(streamer.BigoRoomId, bigoId)) {
+
+					// Auto-bind for future gifts from this sender to this streamer
+					targetId := streamer.BigoId
+					if targetId == "" {
+						targetId = streamer.StreamerId
+					}
+
+					if senderId != "" {
+						s.bindingsMutex.Lock()
+						s.senderBindings[senderId] = SenderBindingCache{
+							StreamerBigoId: targetId,
+							ExpiresAt:      time.Now().Add(60 * time.Second),
+						}
+						s.bindingsMutex.Unlock()
+						fmt.Printf("[BBCoreStream] Sender %s bound to streamer %s for 60s (Trigger: Direct Match on '%s')\n", senderId, targetId, giftName)
+					}
+
+					fmt.Printf("[BBCoreStream] Resolved gift '%s' via direct streamer ID match: %s (Streamer: %s)\n", giftName, bigoId, streamer.Name)
+					return targetId
+				}
+			}
+		}
+	}
+
+	// 4. Fallback: Return empty string to IGNORE unbound gifts
 	return ""
 }

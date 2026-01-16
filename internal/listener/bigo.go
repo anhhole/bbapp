@@ -40,6 +40,9 @@ type BigoGift struct {
 
 	// Value Stats
 	RoomTotalDiamonds int64 // Accumulated diamonds for this room in current session
+
+	// Context
+	TeamId string // Resolved Team ID (optional)
 }
 
 // Keep old Gift for compatibility during transition

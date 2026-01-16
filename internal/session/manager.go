@@ -214,3 +214,8 @@ func (m *Manager) BufferEvent(event interface{}) {
 	// For now, this is a placeholder
 	// m.bigoListener.BufferEvent(event)
 }
+
+// SubscribeOnGift subscribes to gift events
+func (m *Manager) SubscribeOnGift(callback func(interface{})) {
+	m.bigoListener.SubscribeOnGift(callback)
+}

@@ -3,7 +3,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, Square, Radio, Wifi, WifiOff, AlertCircle, Copy, Check, Gift, PlusCircle } from "lucide-react";
+import { Play, Square, Radio, Wifi, WifiOff, AlertCircle, Copy, Check, Gift, PlusCircle, Save } from "lucide-react";
 import {
     StartBigoListener,
     StopBigoListener,
@@ -12,8 +12,12 @@ import {
     GetBigoListenerStatus,
     GetBBCoreStreamStatus,
     ResetSession,
-    GetOverlayURL
+    GetOverlayURL,
+    SaveBBAppConfig
 } from '../../../../../wailsjs/go/main/App';
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 
 interface SessionControlPanelProps {
@@ -35,6 +39,39 @@ export function SessionControlPanel({ config, roomId, durationMinutes, onBack, o
     const { toast } = useToast();
     const [resetConfirm, setResetConfirm] = useState(false);
     const [giftLibrary, setGiftLibrary] = useState<any[]>([]);
+    const [liveConfig, setLiveConfig] = useState<any>(config);
+
+    // Sync config prop to local state
+    useEffect(() => {
+        if (config) setLiveConfig(config);
+    }, [config]);
+
+    const handleUpdateOverlaySetting = (key: string, value: any) => {
+        if (!liveConfig) return;
+
+        const newSettings = {
+            ...(liveConfig.overlaySettings || {}),
+            [key]: value
+        };
+
+        const newConfig = {
+            ...liveConfig,
+            overlaySettings: newSettings
+        };
+
+        setLiveConfig(newConfig);
+    };
+
+    const handleSaveOverlaySettings = async () => {
+        if (!liveConfig) return;
+        try {
+            await SaveBBAppConfig(roomId, liveConfig);
+            toast({ description: "Overlay settings saved successfully!" });
+        } catch (e: any) {
+            console.error(e);
+            toast({ variant: "destructive", description: "Failed to save settings" });
+        }
+    };
 
     useEffect(() => {
         const loadLib = () => {
@@ -253,6 +290,37 @@ export function SessionControlPanel({ config, roomId, durationMinutes, onBack, o
 
     const listenerActive = listenerStatus?.isActive || false;
     const streamActive = streamStatus?.isActive || false;
+
+    const handlePkStartTimer = async () => {
+        if (!streamStatus?.sessionId) return;
+
+        let bbCoreUrl = "";
+        try {
+            const urlObj = new URL(overlayUrl);
+            bbCoreUrl = urlObj.searchParams.get("bbCoreUrl") || "";
+        } catch (e) { console.error("Invalid overlay URL", e); }
+
+        if (!bbCoreUrl) {
+            toast({ variant: "destructive", description: "Could not determine BB Core URL" });
+            return;
+        }
+
+        const token = localStorage.getItem('auth_token') || "";
+        const headers: HeadersInit = token ? {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        } : { 'Content-Type': 'application/json' };
+
+        try {
+            await fetch(`${bbCoreUrl}/api/v1/scripts/${streamStatus.sessionId}/pk/next-round`, {
+                method: 'POST',
+                headers
+            });
+            toast({ title: "Timer Started", description: "PK Round/Timer triggered successfully." });
+        } catch (e: any) {
+            toast({ variant: "destructive", title: "Failed to start timer", description: e.toString() });
+        }
+    };
 
     return (
         <div className="space-y-6 p-6">
@@ -499,14 +567,25 @@ export function SessionControlPanel({ config, roomId, durationMinutes, onBack, o
                                 {streamLoading ? 'Starting...' : 'Start Streaming'}
                             </Button>
                         ) : (
-                            <Button
-                                onClick={handleStopStream}
-                                disabled={streamLoading}
-                                variant="destructive"
-                            >
-                                <Square className="h-4 w-4 mr-2" />
-                                {streamLoading ? 'Stopping...' : 'Stop Streaming'}
-                            </Button>
+                            <>
+                                <Button
+                                    onClick={handleStopStream}
+                                    disabled={streamLoading}
+                                    variant="destructive"
+                                >
+                                    <Square className="h-4 w-4 mr-2" />
+                                    {streamLoading ? 'Stopping...' : 'Stop Streaming'}
+                                </Button>
+
+                                <Button
+                                    onClick={handlePkStartTimer}
+                                    disabled={!streamActive}
+                                    className="bg-indigo-600 hover:bg-indigo-700"
+                                >
+                                    <Play className="h-4 w-4 mr-2" />
+                                    Start PK Timer
+                                </Button>
+                            </>
                         )}
                     </div>
 
@@ -546,6 +625,55 @@ export function SessionControlPanel({ config, roomId, durationMinutes, onBack, o
                     </div>
                 </CardContent>
             </Card>
+            {/* Overlay Settings Card (Moved from Wizard) */}
+            <Card className="border-indigo-500/30">
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-base">Overlay Visuals</CardTitle>
+                    <Button size="sm" onClick={handleSaveOverlaySettings} className="bg-indigo-600 hover:bg-indigo-700 h-8">
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Settings
+                    </Button>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-6">
+
+
+                    <div className="flex items-center space-x-2">
+                        <Switch
+                            id="show-avatar"
+                            checked={liveConfig?.overlaySettings?.showStreamerAvatar ?? true}
+                            onCheckedChange={(c) => handleUpdateOverlaySetting('showStreamerAvatar', c)}
+                        />
+                        <Label htmlFor="show-avatar" className="cursor-pointer">Show Streamer Avatar</Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                        <Switch
+                            id="show-winstreak"
+                            checked={liveConfig?.overlaySettings?.showWinStreak ?? true}
+                            onCheckedChange={(c) => handleUpdateOverlaySetting('showWinStreak', c)}
+                        />
+                        <Label htmlFor="show-winstreak" className="cursor-pointer">Show Win Streak</Label>
+                    </div>
+
+                    <div className="flex flex-col space-y-1.5 col-span-2 mt-2">
+                        <Label htmlFor="timer-duration" className="text-xs text-muted-foreground">Timer Duration (Seconds)</Label>
+                        <div className="flex gap-2">
+                            <Input
+                                id="timer-duration"
+                                type="number"
+                                placeholder="Default: 120"
+                                value={liveConfig?.overlaySettings?.timerDuration || ''}
+                                onChange={(e) => handleUpdateOverlaySetting('timerDuration', parseInt(e.target.value) || 0)}
+                                className="max-w-[150px]"
+                            />
+                            <p className="text-xs text-muted-foreground self-center">
+                                Set to 0 to use session default.
+                            </p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* Recent Gifts Log Card */}
             <Card className="border-purple-500/30">
                 <CardHeader>
